@@ -1,0 +1,87 @@
+######################
+# RockCore .gitignore
+# 排除构建产物、IDE 缓存、发布输出与本地数据
+######################
+
+##### .NET / MSBuild 构建产物 #####
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+artifacts/
+*.dll
+*.exe
+*.pdb
+*.nupkg
+*.snupkg
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vshost.exe
+*.vshost.*
+
+##### NuGet #####
+[Nn]uGet/
+packages/
+!**/packages/repositories.config
+*.nuget.props
+*.nuget.targets
+project.lock.json
+
+##### Visual Studio 2015+ #####
+.vs/
+.vscode/
+.idea/
+*.swp
+*.sdf
+*.vsp
+*.aps
+*.apsui
+*.cachefile
+*.psess
+*.vsp
+*.vspx
+*.tlog
+*.db
+*.db-shm
+*.db-wal
+
+##### Rider / 其他 IDE #####
+.idea/
+*.iml
+
+##### 发布输出（自包含便携版，走 GitHub Releases 分发，不入代码库）#####
+[pP]ublish/
+dist/
+release/
+build/
+out/
+
+##### 本地数据 / 配置 / 密钥 #####
+*.db
+*.sqlite
+*.sqlite3
+*.log
+logs/
+*.local
+appsettings.Local.*
+.env
+.env.*
+secrets/
+*.pem
+*.pfx
+*.key
+
+##### Windows 系统文件 #####
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+##### 日志 #####
+*.log
+
+##### 设计/临时资源（保留，按需用 .gitattributes 标注 binary）#####
+!docs/**/*.png
+!docs/**/*.jpg
+!src/RockCore.Wpf/Resources/*.ico

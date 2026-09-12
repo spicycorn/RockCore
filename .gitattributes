@@ -1,0 +1,42 @@
+# RockCore .gitattributes
+# 统一换行符 + 标注二进制文件，避免跨平台污染与无意义 diff
+
+# ---- 文本文件：统一为 LF（仓库内），检出时按平台处理 ----
+* text=auto
+
+# ---- 明确的文本类型 ----
+*.cs      text
+*.xaml    text
+*.csproj  text
+*.sln     text
+*.slnx    text
+*.md      text
+*.json    text
+*.props   text
+*.targets text
+*.yml     text
+*.yaml    text
+*.txt     text
+*.py      text
+.gitignore text
+.gitattributes text
+LICENSE   text
+
+# ---- 二进制文件：不做换行转换 ----
+*.ico     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.dll     binary
+*.exe     binary
+*.pdb     binary
+*.nupkg   binary
+*.db      binary
+*.sqlite  binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+
+# ---- 文档中的规范参考图（保持二进制，不做 diff）----
+docs/*.png binary
