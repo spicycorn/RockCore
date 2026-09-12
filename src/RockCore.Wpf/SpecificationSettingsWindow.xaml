@@ -1,0 +1,191 @@
+<Window x:Class="RockCore.Wpf.SpecificationSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:RockCore.Wpf"
+        xmlns:enums="clr-namespace:RockCore.Core.Enums;assembly=RockCore.Core"
+        Title="规范设置" Height="720" Width="1100"
+        WindowStartupLocation="CenterOwner" ResizeMode="CanResize">
+    <Window.Resources>
+        <local:EnumDescriptionConverter x:Key="EnumDescriptionConverter"/>
+        <Style x:Key="HeaderCellStyle" TargetType="DataGridColumnHeader">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="#E3F2FD"/>
+            <Setter Property="BorderBrush" Value="#90CAF9"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+        <Style x:Key="CenterCellStyle" TargetType="DataGridCell">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="4"/>
+        </Style>
+        <Style x:Key="RowHeaderStyle" TargetType="DataGridRowHeader">
+            <Setter Property="Width" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="围岩规范参数设置" FontSize="20" FontWeight="Bold"
+                   Foreground="#1E3A5F" Margin="0,0,0,12"/>
+
+        <GroupBox Grid.Row="1" Header="数值阈值" Margin="0,0,0,12" Padding="12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="洞轴线与岩层走向夹角阈值：" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                <TextBox x:Name="CaveAxisThresholdTxt" Width="80" Padding="6"
+                         VerticalContentAlignment="Center" HorizontalContentAlignment="Center"/>
+                <TextBlock Text="°" VerticalAlignment="Center" Margin="4,0,16,0" FontWeight="SemiBold"/>
+                <TextBlock Text="当岩质为硬质岩且岩体结构为互层状结构时，用于判定夹角是否小于该阈值。"
+                           VerticalAlignment="Center" Foreground="Gray"/>
+            </StackPanel>
+        </GroupBox>
+
+        <TabControl Grid.Row="2" Margin="0,0,0,16">
+            <TabItem Header="硬质岩岩体结构对应表">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="表 F.0.2（硬质岩）—— 岩质类型为硬质岩时，各完整性等级对应的岩体结构类型"
+                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                    <DataGrid Grid.Row="1" x:Name="HardRockMappingGrid"
+                              AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserSortColumns="False" IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              CellStyle="{StaticResource CenterCellStyle}"
+                              ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
+                              BorderBrush="#90CAF9" BorderThickness="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="岩体结构类型" Binding="{Binding StructureName}" Width="220"/>
+                            <DataGridCheckBoxColumn Header="完整" Binding="{Binding Intact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="较完整" Binding="{Binding RelativelyIntact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="完整性差" Binding="{Binding Poor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="较破碎" Binding="{Binding RelativelyBroken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="破碎" Binding="{Binding Broken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="软质岩岩体结构对应表">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="表 F.0.2（软质岩）—— 岩质类型为软质岩时，各完整性等级对应的岩体结构类型"
+                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                    <DataGrid Grid.Row="1" x:Name="SoftRockMappingGrid"
+                              AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserSortColumns="False" IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              CellStyle="{StaticResource CenterCellStyle}"
+                              ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
+                              BorderBrush="#90CAF9" BorderThickness="1">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="岩体结构类型" Binding="{Binding StructureName}" Width="220"/>
+                            <DataGridCheckBoxColumn Header="完整" Binding="{Binding Intact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="较完整" Binding="{Binding RelativelyIntact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="完整性差" Binding="{Binding Poor, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="较破碎" Binding="{Binding RelativelyBroken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridCheckBoxColumn Header="破碎" Binding="{Binding Broken, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="岩体完整程度划分表 (F.0.4)">
+                <Grid Margin="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="表 F.0.4 岩体完整程度划分——用于阶段三分析时判定完整性等级的依据"
+                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                    <DataGrid Grid.Row="1" x:Name="IntegrityCriteriaGrid"
+                              AutoGenerateColumns="False" CanUserAddRows="False"
+                              CanUserSortColumns="False" HeadersVisibility="Column"
+                              CellStyle="{StaticResource CenterCellStyle}"
+                              ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
+                              BorderBrush="#90CAF9" BorderThickness="1">
+                        <DataGrid.Columns>
+                            <DataGridComboBoxColumn Header="完整性等级" SelectedItemBinding="{Binding LevelKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120">
+                                <DataGridComboBoxColumn.ElementStyle>
+                                    <Style TargetType="ComboBox">
+                                        <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:IntegrityLevelKeyHelper.Values}}"/>
+                                        <Setter Property="ItemTemplate">
+                                            <Setter.Value>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                </DataTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGridComboBoxColumn.ElementStyle>
+                                <DataGridComboBoxColumn.EditingElementStyle>
+                                    <Style TargetType="ComboBox">
+                                        <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:IntegrityLevelKeyHelper.Values}}"/>
+                                        <Setter Property="ItemTemplate">
+                                            <Setter.Value>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                </DataTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </DataGridComboBoxColumn.EditingElementStyle>
+                            </DataGridComboBoxColumn>
+                            <DataGridTextColumn Header="结构面发育组数" Binding="{Binding JointSetCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="结构面间距 (cm)" Binding="{Binding JointSpacing, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="结构面发育程度" Binding="{Binding JointDevelopment, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                    <TextBlock Grid.Row="2" Text="注：结构面间距指的是主要结构面间距的平均值。"
+                               Foreground="Gray" Margin="0,8,0,0" FontStyle="Italic"/>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="词汇映射">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="8">
+                    <ItemsControl x:Name="TerminologyItems">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding Key}" Width="180"
+                                               VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#333"/>
+                                    <TextBox Grid.Column="1" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             Padding="6" VerticalContentAlignment="Center" Margin="8,0,0,0"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="恢复默认" Width="100" Padding="10,6" Margin="0,0,8,0"
+                    Background="#FF9800" Foreground="White" BorderThickness="0"
+                    Click="ResetDefaults_Click"/>
+            <Button Content="取消" Width="100" Padding="10,6" Margin="0,0,8,0"
+                    Background="#9E9E9E" Foreground="White" BorderThickness="0"
+                    Click="Cancel_Click" IsCancel="True"/>
+            <Button Content="保存" Width="100" Padding="10,6"
+                    Background="#4CAF50" Foreground="White" BorderThickness="0"
+                    Click="Save_Click" IsDefault="True"/>
+        </StackPanel>
+    </Grid>
+</Window>

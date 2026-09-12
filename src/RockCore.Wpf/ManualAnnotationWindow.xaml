@@ -1,0 +1,177 @@
+<Window x:Class="RockCore.Wpf.ManualAnnotationWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="岩芯图像人工标注"
+        Height="780" Width="1280"
+        MinHeight="550" MinWidth="850"
+        WindowStartupLocation="CenterOwner"
+        Loaded="Window_Loaded"
+        SizeChanged="Window_SizeChanged"
+        KeyDown="Window_KeyDown">
+
+    <DockPanel>
+        <!-- ==================== 顶部工具栏 ==================== -->
+        <Border DockPanel.Dock="Top" Background="#F5F5F5" BorderBrush="#D0D0D0" BorderThickness="0,0,0,1">
+            <Grid Margin="8,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 左侧：标注工具 -->
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="工具:" FontWeight="SemiBold" Foreground="#333"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <RadioButton x:Name="ModeScale" Content="① 比例尺" Margin="2" Padding="10,5"
+                                 Background="White" BorderBrush="#AAA"
+                                 Checked="Mode_Checked" IsChecked="True" GroupName="AnnotationMode"/>
+                    <RadioButton x:Name="ModePiece" Content="② 岩芯段（折线）" Margin="2" Padding="10,5"
+                                 Background="White" BorderBrush="#AAA"
+                                 Checked="Mode_Checked" GroupName="AnnotationMode"/>
+                </StackPanel>
+
+                <!-- 中间：状态提示 -->
+                <TextBlock x:Name="StatusText" Grid.Column="1" TextAlignment="Center"
+                           Text="在图像上点击两点标注比例尺"
+                           VerticalAlignment="Center" Foreground="#555" FontSize="12"
+                           TextTrimming="CharacterEllipsis" Margin="10,0"/>
+
+                <!-- 右侧：操作按钮 -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="RotateButton" Content="↻ 旋转90°" Click="RotateButton_Click"
+                            Padding="10,5" Margin="2" Background="White" BorderBrush="#AAA"/>
+                    <Border Width="1" Background="#CCC" Margin="6,2"/>
+                    <Button x:Name="UndoButton" Content="↩ 撤销" Click="UndoButton_Click"
+                            Padding="10,5" Margin="2" Background="#FFF3E0" BorderBrush="#FFB74D"/>
+                    <Button x:Name="ClearButton" Content="清空全部" Click="ClearButton_Click"
+                            Padding="10,5" Margin="2" Background="#FFEBEE" BorderBrush="#EF9A9A"/>
+                    <Border Width="1" Background="#CCC" Margin="6,2"/>
+                    <Button x:Name="FinishButton" Content="✓ 完成并计算" Click="FinishButton_Click"
+                            Background="#27AE60" Foreground="White" BorderThickness="0"
+                            Padding="14,6" FontWeight="SemiBold" Margin="4,0"/>
+                    <Button x:Name="CancelButton" Content="取消" Click="CancelButton_Click"
+                            Padding="10,5" Margin="2,0" Background="White" BorderBrush="#AAA"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ==================== 右侧标注数据面板 ==================== -->
+        <Border DockPanel.Dock="Right" Width="310" Background="#FAFAFA"
+                BorderBrush="#D0D0D0" BorderThickness="1,0,0,0">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="12,10,12,16">
+
+                    <TextBlock Text="标注信息" FontWeight="Bold" FontSize="14"
+                               Foreground="#222" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="ZoomInfo" FontSize="11" Foreground="#666" Margin="0,0,0,8"
+                               Text="原图尺寸: 加载中…"/>
+
+                    <!-- 比例尺 -->
+                    <Border Background="White" BorderBrush="#DDD" BorderThickness="1"
+                            CornerRadius="3" Padding="10" Margin="0,4">
+                        <StackPanel>
+                            <TextBlock Text="比例尺" FontWeight="SemiBold" Foreground="#333"/>
+                            <TextBlock x:Name="ScaleInfo" Text="未设置（点击图像两点标注）"
+                                       Foreground="#E67E22" TextWrapping="Wrap" Margin="0,3,0,6" FontSize="12"/>
+                            <Grid>
+                                <TextBlock Text="每行岩芯长度(cm):" VerticalAlignment="Center" FontSize="11"
+                                           Foreground="#666"/>
+                                <TextBox x:Name="ScaleCmInput" HorizontalAlignment="Right" Text="100"
+                                         TextAlignment="Right" Padding="6,3" Width="100"
+                                         LostFocus="ScaleCmInput_LostFocus" BorderBrush="#BBB"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+
+
+                    <!-- 岩芯段 -->
+                    <Border Background="White" BorderBrush="#DDD" BorderThickness="1"
+                            CornerRadius="3" Padding="10" Margin="0,4">
+                        <StackPanel>
+                            <TextBlock x:Name="PiecesHeader" Text="岩芯段 (0)" FontWeight="SemiBold"
+                                       Foreground="#333"/>
+                            <ItemsControl x:Name="PiecesList" MaxHeight="200"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 节理/裂隙：由分析器自动计算（来自岩芯段间隙），不需用户绘制 -->
+                    <!-- 节理/裂隙显示由分析器计算，无需手动标注 -->
+
+                    <!-- 深度 -->
+                    <Border Background="White" BorderBrush="#DDD" BorderThickness="1"
+                            CornerRadius="3" Padding="10" Margin="0,4">
+                        <StackPanel>
+                            <TextBlock Text="深度范围 (米)" FontWeight="SemiBold"
+                                       Foreground="#333" Margin="0,0,0,4"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel>
+                                    <TextBlock Text="起点" FontSize="10" Foreground="#666"/>
+                                    <TextBox x:Name="DepthStartInput" Padding="6,3" TextAlignment="Right"
+                                             BorderBrush="#BBB"/>
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="—" FontSize="12" Foreground="#999"
+                                           VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="4,0"/>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="终点" FontSize="10" Foreground="#666"/>
+                                    <TextBox x:Name="DepthEndInput" Padding="6,3" TextAlignment="Right"
+                                             BorderBrush="#BBB"/>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 操作提示 -->
+                    <Border Background="#E8F0FE" CornerRadius="3" Padding="10" Margin="0,8,0,0">
+                        <StackPanel>
+                            <TextBlock Text="操作提示" FontWeight="SemiBold" FontSize="11"
+                                       Foreground="#2C5282" Margin="0,0,0,3"/>
+                            <TextBlock Text="• 左键点击两点：标注比例尺"
+                                       FontSize="10" Foreground="#4A5568"/>
+                            <TextBlock Text="• 左键依次点击绘制岩芯段折线，右键/回车结束"
+                                       FontSize="10" Foreground="#4A5568"/>
+                            <TextBlock Text="• 旋转：旋转图像90°（自动重新铺满窗口）"
+                                       FontSize="10" Foreground="#4A5568"/>
+                            <TextBlock Text="• 节理/裂隙由岩芯段间隙自动计算"
+                                       FontSize="10" Foreground="#4A5568"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+
+        <!-- ==================== 左侧图像画布区 ==================== -->
+        <!-- 关键架构：
+             Viewbox (Stretch=Uniform，随窗口自动等比例缩放图像，始终铺满可见区域)
+             └── Border (浅灰背景)
+                  └── Canvas (固定尺寸=图像原始像素，LayoutTransform=旋转)
+                       ├── Image (Stretch=Fill，占据整个 Canvas)
+                       └── 标注图形 (Rectangle/Line/Ellipse/Border，坐标=原始像素坐标)
+
+             - 鼠标事件 e.GetPosition(ImageCanvas) 直接返回图像原始像素坐标
+             - LayoutTransform 只做视觉旋转，坐标逻辑保持一致
+             - Viewbox 自动根据 LayoutTransform 旋转后的 DesiredSize 适配容器
+             - 旋转按钮改变 RotateTransform.Angle，布局自动重新计算
+             - 没有 ScrollViewer、没有手动缩放、没有右键拖动——所有交互由 Viewbox 统一管理
+        -->
+        <Border x:Name="ImageHostBorder" Background="#F0F0F0" ClipToBounds="True">
+            <Viewbox x:Name="ImageViewbox" Stretch="Uniform" StretchDirection="Both"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" Margin="8">
+                <Canvas x:Name="ImageCanvas" Background="Transparent"
+                        MouseLeftButtonDown="ImageCanvas_MouseLeftButtonDown"
+                        MouseMove="ImageCanvas_MouseMove"
+                        MouseLeftButtonUp="ImageCanvas_MouseLeftButtonUp"
+                        MouseRightButtonDown="ImageCanvas_MouseRightButtonDown">
+                    <Image x:Name="SourceImage" Stretch="Fill"
+                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Canvas>
+            </Viewbox>
+        </Border>
+    </DockPanel>
+</Window>

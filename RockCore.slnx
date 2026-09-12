@@ -1,0 +1,8 @@
+<Solution>
+  <Configuration StartupProject="src/RockCore.Wpf/RockCore.Wpf.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/RockCore.Core/RockCore.Core.csproj" />
+    <Project Path="src/RockCore.Infrastructure/RockCore.Infrastructure.csproj" />
+    <Project Path="src/RockCore.Wpf/RockCore.Wpf.csproj" />
+  </Folder>
+</Solution>
