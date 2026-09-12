@@ -1,1 +1,99 @@
+name: Build & Release
 
+on:
+  push:
+    branches: [ main, master ]
+    # 打标签（如 v1.0.0）时触发正式发布到 GitHub Releases
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: 8.0.x
+  NUGET_PACKAGES: ${{ github.workspace }}/.nuget/packages
+
+jobs:
+  build:
+    name: Build self-contained win-x64
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore RockCore.slnx
+
+      - name: Build (验证可编译)
+        run: dotnet build RockCore.slnx -c Release --no-restore
+
+      - name: Publish 自包含 win-x64 便携版
+        run: >
+          dotnet publish src/RockCore.Wpf/RockCore.Wpf.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=false
+          -o publish
+
+      - name: 生成使用说明
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF -replace 'refs/tags/v','' } else { 'dev' }
+          $note = @"
+          ========================================
+            RockCore - 岩芯图像分析系统
+            使用说明
+          ========================================
+          【系统要求】
+          - Windows 10 / Windows 11（64 位）
+          - 无需安装 .NET 运行时（已内置，自包含）
+          - 建议内存 4GB 以上，磁盘空间 300MB 以上
+
+          【使用方法】
+          1. 解压压缩包到任意目录（路径勿含中文/特殊字符）
+          2. 双击 RockCore.Wpf.exe 启动
+          3. 项目数据保存在用户自选位置；配置在 %LocalAppData%\RockCore\
+
+          版本：$ver   架构：win-x64   运行时：.NET 8（自包含）
+          "@
+          Set-Content -Path "publish\使用说明.txt" -Value $note -Encoding UTF8
+
+      - name: 打包 zip
+        shell: pwsh
+        run: |
+          $ver = if ($env:GITHUB_REF -like 'refs/tags/v*') { $env:GITHUB_REF -replace 'refs/tags/v','' } else { 'dev-' + $env:GITHUB_SHA.Substring(0,7) }
+          $name = "RockCore-win-x64-portable-v$ver.zip"
+          Compress-Archive -Path "publish\*" -DestinationPath $name -CompressionLevel Optimal
+          Write-Host "Created $name"
+          # 让后续步骤能引用
+          "name=$name" >> $env:GITHUB_ENV
+
+      - name: 上传构建产物 (Artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.name }}
+          path: ${{ env.name }}
+          retention-days: 90
+
+      - name: 发布到 GitHub Release (打标签时)
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          # 版本说明
+          body: |
+            ## RockCore 自包含便携版（win-x64）
+
+            - 适用：**Windows 10 / 11（64 位）**，免安装 .NET 运行时。
+            - 解压后双击 `RockCore.Wpf.exe` 即可运行。
+            - 数据存于用户自选目录；配置在 `%LocalAppData%\RockCore\`。
+
+            > 依据 DL/T 5894-2025《压气储能电站工程地质勘察规范》实现围岩初步分类。
