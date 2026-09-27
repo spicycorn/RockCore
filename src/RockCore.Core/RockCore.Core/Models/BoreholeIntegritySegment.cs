@@ -20,6 +20,9 @@ public partial class BoreholeIntegritySegment : ObservableObject
     /// <summary>深度终点（米）</summary>
     public double DepthEnd { get; set; }
 
+    /// <summary>分段长度（米）= DepthEnd - DepthStart</summary>
+    public double Length => DepthEnd - DepthStart;
+
     /// <summary>完整性等级：完整/较完整/完整性差/较破碎/破碎</summary>
     public IntegrityLevel IntegrityLevel { get; set; }
 
@@ -68,6 +71,12 @@ public partial class BoreholeIntegritySegment : ObservableObject
     partial void OnRockTypeChanged(RockType value)
     {
         OnPropertyChanged(nameof(AvailableRockStructureTypes));
+        if (value == RockType.NotSet)
+        {
+            // 岩质类型清除时，同时清空岩体结构类型
+            RockStructureType = RockStructureType.NotSet;
+            return;
+        }
         if (RockStructureType != RockStructureType.NotSet &&
             !AvailableRockStructureTypes.Contains(RockStructureType))
         {

@@ -50,6 +50,10 @@ public class ProjectStatisticsService
                 kv => kv.Key,
                 kv => borehole.TotalDepth > 0 ? kv.Value / borehole.TotalDepth : 0);
 
+            var classRatiosByAnalyzed = classLengths.ToDictionary(
+                kv => kv.Key,
+                kv => classifiedLength > 0 ? kv.Value / classifiedLength : 0);
+
             result.BoreholeStatistics.Add(new BoreholeStatistics
             {
                 BoreholeId = borehole.Id,
@@ -59,12 +63,15 @@ public class ProjectStatisticsService
                 UnclassifiedLength = unclassifiedLength,
                 ClassLengths = classLengths,
                 ClassRatios = classRatios,
-                ClassSummary = BuildBoreholeClassSummary(classRatios)
+                ClassRatiosByAnalyzed = classRatiosByAnalyzed,
+                ClassSummary = BuildBoreholeClassSummary(classRatios),
+                ClassSummaryByAnalyzed = BuildBoreholeClassSummary(classRatiosByAnalyzed)
             });
         }
 
         // 项目整体统计：每类围岩，按项目岩芯总长度计算占比
         var allClassGroups = segmentList.GroupBy(s => s.RockClass);
+        double analyzedBase = result.TotalClassifiedLength;
         foreach (RockClass rockClass in Enum.GetValues<RockClass>())
         {
             var group = allClassGroups.FirstOrDefault(g => g.Key == rockClass);
@@ -84,6 +91,7 @@ public class ProjectStatisticsService
                 ClassDescription = ClassDescription(rockClass),
                 TotalLength = totalLength,
                 Ratio = totalCoreLength > 0 ? totalLength / totalCoreLength : 0,
+                RatioByAnalyzed = analyzedBase > 0 ? totalLength / analyzedBase : 0,
                 BoreholeCount = boreholeCount,
                 DepthRanges = ranges
             });
@@ -105,7 +113,8 @@ public class ProjectStatisticsService
             })
             .ToList();
 
-        result.OverallClassSummary = BuildOverallClassSummary(result.ClassStatistics);
+        result.OverallClassSummary = BuildOverallClassSummary(result.ClassStatistics, s => s.Ratio);
+        result.OverallClassSummaryByAnalyzed = BuildOverallClassSummary(result.ClassStatistics, s => s.RatioByAnalyzed);
         return result;
     }
 
@@ -118,25 +127,14 @@ public class ProjectStatisticsService
         return string.Join("；", parts);
     }
 
-    private static string BuildOverallClassSummary(List<RockClassStatistics> classStatistics)
+    private static string BuildOverallClassSummary(List<RockClassStatistics> classStatistics, Func<RockClassStatistics, double> ratioSelector)
     {
         var parts = classStatistics
             .OrderBy(s => s.RockClass)
-            .Select(s => $"{ClassDescription(s.RockClass)}类：{s.Ratio:P0}")
+            .Select(s => $"{ClassDescription(s.RockClass)}类：{ratioSelector(s):P0}")
             .ToList();
         return string.Join("；", parts);
     }
 
-    private static string ClassDescription(RockClass rockClass)
-    {
-        return rockClass switch
-        {
-            RockClass.I => "Ⅰ",
-            RockClass.II => "Ⅱ",
-            RockClass.III => "Ⅲ",
-            RockClass.IV => "Ⅳ",
-            RockClass.V => "Ⅴ",
-            _ => rockClass.ToString()
-        };
-    }
+    private static string ClassDescription(RockClass rockClass) => RockClassText.Numeral(rockClass);
 }

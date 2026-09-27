@@ -71,7 +71,7 @@ public class RockCoreDbContext : IDisposable
                 DepthStart REAL NOT NULL,
                 DepthEnd REAL NOT NULL,
                 BoxNumber INTEGER DEFAULT 0,
-                IntegrityLevel INTEGER DEFAULT 5,
+                IntegrityLevel INTEGER DEFAULT 0,
                 IntegrityIndex REAL DEFAULT 0,
                 RQD REAL DEFAULT 0,
                 JointCount INTEGER DEFAULT 0,

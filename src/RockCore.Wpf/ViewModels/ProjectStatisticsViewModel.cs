@@ -23,6 +23,9 @@ public partial class ProjectStatisticsViewModel : ObservableObject
     private string _overallClassSummary = string.Empty;
 
     [ObservableProperty]
+    private string _overallClassSummaryByAnalyzed = string.Empty;
+
+    [ObservableProperty]
     private ObservableCollection<ClassStatViewModel> _classStats = new();
 
     [ObservableProperty]
@@ -37,6 +40,7 @@ public partial class ProjectStatisticsViewModel : ObservableObject
         TotalClassifiedLength = result.TotalClassifiedLength;
         TotalUnclassifiedLength = result.TotalUnclassifiedLength;
         OverallClassSummary = result.OverallClassSummary;
+        OverallClassSummaryByAnalyzed = result.OverallClassSummaryByAnalyzed;
 
         ClassStats.Clear();
         foreach (var stat in result.ClassStatistics)
@@ -66,6 +70,7 @@ public partial class ClassStatViewModel : ObservableObject
         ClassDescription = stat.ClassDescription;
         TotalLength = stat.TotalLength;
         Ratio = stat.Ratio;
+        RatioByAnalyzed = stat.RatioByAnalyzed;
         BoreholeCount = stat.BoreholeCount;
         DepthRangeText = string.Join("、", stat.DepthRanges.Select(r => $"{r.Start:F2}-{r.End:F2}m"));
     }
@@ -83,6 +88,9 @@ public partial class ClassStatViewModel : ObservableObject
     private double _ratio;
 
     [ObservableProperty]
+    private double _ratioByAnalyzed;
+
+    [ObservableProperty]
     private int _boreholeCount;
 
     [ObservableProperty]
@@ -98,6 +106,7 @@ public partial class BoreholeStatViewModel : ObservableObject
         ClassifiedLength = stat.ClassifiedLength;
         UnclassifiedLength = stat.UnclassifiedLength;
         ClassSummary = stat.ClassSummary;
+        ClassSummaryByAnalyzed = stat.ClassSummaryByAnalyzed;
     }
 
     [ObservableProperty]
@@ -114,6 +123,9 @@ public partial class BoreholeStatViewModel : ObservableObject
 
     [ObservableProperty]
     private string _classSummary = string.Empty;
+
+    [ObservableProperty]
+    private string _classSummaryByAnalyzed = string.Empty;
 }
 
 public partial class WeakSectionViewModel : ObservableObject

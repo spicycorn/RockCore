@@ -1,6 +1,8 @@
 using System.Linq;
 using RockCore.Core.Enums;
+using RockCore.Core.Interfaces;
 using RockCore.Core.Models;
+using RockCore.Core.Services;
 
 namespace RockCore.Infrastructure.ImageAnalysis;
 
@@ -17,8 +19,29 @@ namespace RockCore.Infrastructure.ImageAnalysis;
 /// </summary>
 public class RuleEngineImageAnalyzer
 {
+    private readonly ISpecificationService? _specificationService;
+
+    public RuleEngineImageAnalyzer() : this(null) { }
+
+    public RuleEngineImageAnalyzer(ISpecificationService? specificationService)
+    {
+        _specificationService = specificationService;
+    }
+
     public string Name => "规则引擎分析器";
     public string Version => "1.0.0";
+
+    /// <summary>
+    /// 获取当前生效的完整程度划分表（规范表 F.0.4）。
+    /// 优先读取规范设置中用户配置的表；配置为空时回退到内置默认表。
+    /// </summary>
+    private List<IntegrityLevelCriterion> GetCriteria()
+    {
+        var configured = _specificationService?.CurrentConfig?.IntegrityLevelCriteria;
+        if (configured != null && configured.Count > 0)
+            return configured;
+        return IntegrityCriteriaEngine.GetDefaultCriteria();
+    }
 
     // ====================================================================
     // 核心入口：基于人工标注数据计算分析结果
@@ -166,6 +189,10 @@ public class RuleEngineImageAnalyzer
                 .First();
             result.IntegrityLevel = dominantSeg.Level;
         }
+
+        // --- 照片级节理总数：由各分段的节理数（= 段内岩芯段数 - 1）汇总 ---
+        // 与分段判定逻辑保持一致，避免照片级统计恒为 0 的显示问题
+        result.JointCount = result.IntegritySegments.Sum(s => s.JointCount);
         if (result.DevelopmentSegments.Count > 0)
         {
             var dominantDevSeg = result.DevelopmentSegments
@@ -310,56 +337,35 @@ public class RuleEngineImageAnalyzer
     }
 
     // ====================================================================
-    // 双判定核心方法：严格依据 DL/T 5894-2025 表 F.0.4
+    // 双判定核心方法：依据 DL/T 5894-2025 表 F.0.4（可配置）
     //   输入：jointCount — 节理数（≥ 0）
     //         spacingCm  — 结构面间距（cm），即相邻节理之间的距离
-    //   严格匹配：节理数和结构面间距必须同时满足表中某一行的条件
-    //   按行从上到下检查（行1最严格，行7最宽松），首次匹配即返回
-    //
-    //   表 F.0.4（完整边界调为 95cm）：
-    //   行1: J∈[1,2] 且 S>95    → 完整 / 不发育
-    //   行2: J∈[1,2] 且 S∈(50,95] → 较完整 / 轻度发育
-    //   行3: J∈[2,3] 且 S∈(30,50] → 较完整 / 中等发育
-    //   行4: J∈[2,3] 且 S∈(10,30] → 完整性差 / 较发育
-    //   行5: J∈[2,3] 且 S≤10     → 完整性差 / 发育
-    //   行6: J>3     且 S≤10     → 较破碎 / 很发育
-    //   行7: S<2cm（无序）       → 破碎 / ——
-    //   无匹配时：仅按结构面间距区间兜底（不再考虑节理数组合）
+    //   判定依据：规范设置中的完整程度划分表（IntegrityLevelCriteria），
+    //   按行序检查，节理数与间距同时满足某一行即返回该行等级；
+    //   配置为空时使用内置默认表（与历史版本行为一致）。
+    //   无匹配时：仅按结构面间距区间兜底（不再考虑节理数组合）。
+    //   区间记法：见 IntegrityCriteriaEngine（如 "1~2"、">95"、"50~95"、"≤10"、"—"）
     // ====================================================================
-    private static (IntegrityLevel Level, string Development, string Basis)
+    private (IntegrityLevel Level, string Development, string Basis)
         JudgeSegmentDouble(int jointCount, double spacingCm)
     {
-        // ---- 严格双条件匹配（按表行顺序检查）----
-        if (spacingCm > 0 && spacingCm < 2)
+        // ---- 按配置判定表匹配（按行序，首次匹配即返回）----
+        // 间距无效（≤0，如缺少比例尺）时跳过配置表，直接走兜底逻辑，与历史行为一致
+        IntegrityLevelCriterion? hit = null;
+        if (spacingCm > 0)
+            hit = IntegrityCriteriaEngine.TryMatch(GetCriteria(), jointCount, spacingCm);
+        if (hit != null)
         {
-            return (IntegrityLevel.Broken, "——", $"结构面间距{spacingCm:F1}cm（<2cm，无序）→ 破碎");
-        }
-        else if (jointCount >= 1 && jointCount <= 2 && spacingCm > 95)
-        {
-            return (IntegrityLevel.Intact, "不发育", $"节理{jointCount}条，结构面间距{spacingCm:F1}cm（>95cm）→ 完整/不发育");
-        }
-        else if (jointCount >= 1 && jointCount <= 2 && spacingCm > 50 && spacingCm <= 95)
-        {
-            return (IntegrityLevel.RelativelyIntact, "轻度发育", $"节理{jointCount}条，结构面间距{spacingCm:F1}cm（50~95cm）→ 较完整/轻度发育");
-        }
-        else if (jointCount >= 2 && jointCount <= 3 && spacingCm > 30 && spacingCm <= 50)
-        {
-            return (IntegrityLevel.RelativelyIntact, "中等发育", $"节理{jointCount}条，结构面间距{spacingCm:F1}cm（30~50cm）→ 较完整/中等发育");
-        }
-        else if (jointCount >= 2 && jointCount <= 3 && spacingCm > 10 && spacingCm <= 30)
-        {
-            return (IntegrityLevel.Poor, "较发育", $"节理{jointCount}条，结构面间距{spacingCm:F1}cm（10~30cm）→ 完整性差/较发育");
-        }
-        else if (jointCount >= 2 && jointCount <= 3 && spacingCm > 0 && spacingCm <= 10)
-        {
-            return (IntegrityLevel.Poor, "发育", $"节理{jointCount}条，结构面间距{spacingCm:F1}cm（≤10cm）→ 完整性差/发育");
-        }
-        else if (jointCount > 3 && spacingCm > 0 && spacingCm <= 10)
-        {
-            return (IntegrityLevel.RelativelyBroken, "很发育", $"节理{jointCount}条（>3），结构面间距{spacingCm:F1}cm（≤10cm）→ 较破碎/很发育");
+            var level = IntegrityCriteriaEngine.ParseLevel(hit.LevelKey);
+            if (level != IntegrityLevel.Unknown)
+            {
+                var dev = string.IsNullOrWhiteSpace(hit.JointDevelopment) ? "—" : hit.JointDevelopment;
+                return (level, dev,
+                    $"节理{jointCount}条，结构面间距{spacingCm:F1}cm → {hit.LevelKey}/{dev}（配置判定表）");
+            }
         }
 
-        // ---- 无严格匹配时：仅按结构面间距区间兜底 ----
+        // ---- 无匹配时：仅按结构面间距区间兜底 ----
         if (spacingCm > 95)
             return (IntegrityLevel.Intact, "不发育", $"结构面间距{spacingCm:F1}cm（>95cm，仅按间距兜底）→ 完整/不发育");
         else if (spacingCm > 50 && spacingCm <= 95)
@@ -380,7 +386,7 @@ public class RuleEngineImageAnalyzer
     // 完整性等级分段（独立判断维度）
     // 三阶段合并：单piece等级初步合并 → 最终判定 → 强行合并相邻同等级段
     // ====================================================================
-    private static List<IntegritySegment> GenerateIntegritySegments(
+    private List<IntegritySegment> GenerateIntegritySegments(
         List<List<CorePiece>> rows, double depthStart, double depthEnd, double pixelPerCm, double scaleCm)
     {
         return GenerateSegments<IntegritySegment>(
@@ -422,7 +428,7 @@ public class RuleEngineImageAnalyzer
     // 结构面发育程度分段（独立判断维度）
     // 三阶段合并：单piece等级初步合并 → 最终判定 → 强行合并相邻同发育程度段
     // ====================================================================
-    private static List<DevelopmentSegment> GenerateDevelopmentSegments(
+    private List<DevelopmentSegment> GenerateDevelopmentSegments(
         List<List<CorePiece>> rows, double depthStart, double depthEnd, double pixelPerCm, double scaleCm)
     {
         return GenerateSegments<DevelopmentSegment>(

@@ -97,6 +97,12 @@ public partial class SpecificationSettingsWindow : Window
         {
             foreach (var row in criteriaRows)
             {
+                // 跳过未填写完整的行（如新增后未选择的空行），避免产生无效判定行
+                if (row.LevelKey == IntegrityLevel.Unknown)
+                    continue;
+                if (string.IsNullOrWhiteSpace(row.JointSetCount) && string.IsNullOrWhiteSpace(row.JointSpacing))
+                    continue;
+
                 _config.IntegrityLevelCriteria.Add(new IntegrityLevelCriterion
                 {
                     LevelKey = IntegrityCriterionRow.ToLevelKeyString(row.LevelKey),
@@ -105,6 +111,13 @@ public partial class SpecificationSettingsWindow : Window
                     JointDevelopment = row.JointDevelopment
                 });
             }
+        }
+
+        // 若用户清空了所有行，回退到默认判定表，避免保存空表导致判定失效
+        if (_config.IntegrityLevelCriteria.Count == 0)
+        {
+            _config.IntegrityLevelCriteria = RockCore.Core.Services.IntegrityCriteriaEngine.GetDefaultCriteria();
+            MessageBox.Show("判定表不能为空，已恢复默认判定表。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
         }
 
         _specificationService.SaveConfig(_config);
@@ -176,6 +189,11 @@ public class IntegrityCriterionRow : INotifyPropertyChanged
     {
         get => _jointDevelopment;
         set => SetProperty(ref _jointDevelopment, value);
+    }
+
+    /// <summary>无参构造（供 DataGrid 新增行使用）</summary>
+    public IntegrityCriterionRow()
+    {
     }
 
     public IntegrityCriterionRow(IntegrityLevelCriterion criterion)

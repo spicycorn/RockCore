@@ -65,17 +65,25 @@ public partial class MainViewModel : ObservableObject
         GroundwaterCondition.Wet
     };
 
+    private List<CaveAxisOptionViewModel>? _caveAxisOptionsCache;
+    private double _caveAxisCacheThreshold = -1;
+
     public List<CaveAxisOptionViewModel> CaveAxisOptions
     {
         get
         {
             double threshold = _specificationService.GetCaveAxisThreshold();
-            return new List<CaveAxisOptionViewModel>
+            if (_caveAxisOptionsCache != null && Math.Abs(_caveAxisCacheThreshold - threshold) < 0.001)
+                return _caveAxisOptionsCache;
+
+            _caveAxisOptionsCache = new List<CaveAxisOptionViewModel>
             {
                 new CaveAxisOptionViewModel { Text = "未设置", Value = null },
                 new CaveAxisOptionViewModel { Text = $"小于{threshold:F0}°", Value = true },
                 new CaveAxisOptionViewModel { Text = $"大于等于{threshold:F0}°", Value = false }
             };
+            _caveAxisCacheThreshold = threshold;
+            return _caveAxisOptionsCache;
         }
     }
 
@@ -219,7 +227,7 @@ public partial class MainViewModel : ObservableObject
 
         // 生成摘要文本
         var integrity = photo.IntegrityLevel;
-        string integrityText = integrity == IntegrityLevel.UserOverride ? "未评定" : integrity.ToString();
+        string integrityText = (integrity == IntegrityLevel.UserOverride || integrity == IntegrityLevel.Unknown) ? "未评定" : integrity.ToString();
         AnalysisDetail =
             $"照片: {photo.FileName}\n" +
             $"深度范围: {photo.DepthStart:F2} m - {photo.DepthEnd:F2} m\n" +
@@ -265,9 +273,9 @@ public partial class MainViewModel : ObservableObject
                     allSegments.Add((seg.DepthStart, seg.DepthEnd, seg.Level));
                 }
             }
-            catch
+            catch (System.Text.Json.JsonException ex)
             {
-                // 解析失败则跳过
+                System.Diagnostics.Trace.WriteLine($"[RockCore] 照片 {photo.FileName} 的分析结果 JSON 解析失败，已跳过: {ex.Message}");
             }
         }
 
@@ -942,16 +950,7 @@ public partial class MainViewModel : ObservableObject
             {
                 double len = g.Sum(s => s.DepthEnd - s.DepthStart);
                 double ratio = len / totalLength;
-                string classText = g.Key switch
-                {
-                    RockClass.I => "Ⅰ",
-                    RockClass.II => "Ⅱ",
-                    RockClass.III => "Ⅲ",
-                    RockClass.IV => "Ⅳ",
-                    RockClass.V => "Ⅴ",
-                    _ => g.Key.ToString()
-                };
-                return $"{classText}类：{ratio:P1}";
+                return $"{RockClassText.WithSuffix(g.Key)}：{ratio:P1}";
             });
 
         CurrentBoreholeClassSummary = $"{SelectedBorehole.Number}围岩分类：{string.Join("；", classGroups)}";

@@ -5,7 +5,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using Microsoft.Extensions.DependencyInjection;
 using RockCore.Core.Models;
+using RockCore.Infrastructure.ImageAnalysis;
 using RockCore.Wpf.ViewModels;
 
 namespace RockCore.Wpf;
@@ -578,7 +580,8 @@ public partial class ManualAnnotationWindow : Window
                 double.TryParse(ScaleCmInput.Text, out scaleCmVal);
             if (scaleCmVal <= 0) scaleCmVal = 100.0;
 
-            var analyzer = new RockCore.Infrastructure.ImageAnalysis.RuleEngineImageAnalyzer();
+            // 使用 DI 注册的分析器实例（已注入 ISpecificationService，可读取规范设置中的判定表）
+            var analyzer = App.Services.GetRequiredService<RuleEngineImageAnalyzer>();
             
             // 传递比例尺端点（用于标注图绘制）
             (double x, double y)? scaleP1 = _scaleP1.HasValue ? (_scaleP1.Value.X, _scaleP1.Value.Y) : null;

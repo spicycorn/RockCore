@@ -40,9 +40,14 @@ public class ProjectStatisticsResult
     public List<WeakSection> WeakSections { get; set; } = new();
 
     /// <summary>
-    /// 项目总体围岩分类占比文本，如 "Ⅰ类：25%；Ⅱ类：20%……"。
+    /// 项目总体围岩分类占比文本（分母 = 钻孔总深度之和），如 "Ⅰ类：25%；Ⅱ类：20%……"。
     /// </summary>
     public string OverallClassSummary { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 项目总体围岩分类占比文本（分母 = 已分析岩芯长度之和）。
+    /// </summary>
+    public string OverallClassSummaryByAnalyzed { get; set; } = string.Empty;
 }
 
 public class RockClassStatistics
@@ -57,9 +62,14 @@ public class RockClassStatistics
     public double TotalLength { get; set; }
 
     /// <summary>
-    /// 占项目岩芯总长度比例（0~1）。
+    /// 占比（0~1），分母 = 项目岩芯总长度（钻孔总深度之和）。
     /// </summary>
     public double Ratio { get; set; }
+
+    /// <summary>
+    /// 占比（0~1），分母 = 项目已分析岩芯长度之和。
+    /// </summary>
+    public double RatioByAnalyzed { get; set; }
 
     /// <summary>
     /// 出现该类别的钻孔数。
@@ -95,12 +105,25 @@ public class BoreholeStatistics
 
     public Dictionary<RockClass, double> ClassLengths { get; set; } = new();
 
+    /// <summary>
+    /// 各类别占比（分母 = 钻孔总深度）。
+    /// </summary>
     public Dictionary<RockClass, double> ClassRatios { get; set; } = new();
 
     /// <summary>
-    /// 该钻孔围岩分类占比文本。
+    /// 各类别占比（分母 = 该钻孔已分析岩芯长度）。
+    /// </summary>
+    public Dictionary<RockClass, double> ClassRatiosByAnalyzed { get; set; } = new();
+
+    /// <summary>
+    /// 该钻孔围岩分类占比文本（分母 = 钻孔总深度）。
     /// </summary>
     public string ClassSummary { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 该钻孔围岩分类占比文本（分母 = 已分析岩芯长度）。
+    /// </summary>
+    public string ClassSummaryByAnalyzed { get; set; } = string.Empty;
 }
 
 public class WeakSection

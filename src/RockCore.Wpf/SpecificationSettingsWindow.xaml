@@ -112,7 +112,8 @@
                     <TextBlock Grid.Row="0" Text="表 F.0.4 岩体完整程度划分——用于阶段三分析时判定完整性等级的依据"
                                FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
                     <DataGrid Grid.Row="1" x:Name="IntegrityCriteriaGrid"
-                              AutoGenerateColumns="False" CanUserAddRows="False"
+                              AutoGenerateColumns="False" CanUserAddRows="True"
+                              CanUserDeleteRows="True"
                               CanUserSortColumns="False" HeadersVisibility="Column"
                               CellStyle="{StaticResource CenterCellStyle}"
                               ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
@@ -149,8 +150,12 @@
                             <DataGridTextColumn Header="结构面发育程度" Binding="{Binding JointDevelopment, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
-                    <TextBlock Grid.Row="2" Text="注：结构面间距指的是主要结构面间距的平均值。"
-                               Foreground="Gray" Margin="0,8,0,0" FontStyle="Italic"/>
+                    <StackPanel Grid.Row="2" Margin="0,8,0,0">
+                        <TextBlock Foreground="Gray" FontStyle="Italic"
+                                   Text="注：结构面间距指主要结构面间距的平均值；行序 = 判定优先级（从上到下逐行匹配，首次匹配即生效）。"/>
+                        <TextBlock Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0"
+                                   Text="区间写法：组数如 1~2、&gt;3、—（不限）；间距(cm)如 &gt;95、50~95、≤10、&lt;2、—（不限）。"/>
+                    </StackPanel>
                 </Grid>
             </TabItem>
 

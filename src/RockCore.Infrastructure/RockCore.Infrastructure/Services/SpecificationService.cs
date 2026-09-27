@@ -6,6 +6,7 @@ using System.Text.Json;
 using RockCore.Core.Enums;
 using RockCore.Core.Interfaces;
 using RockCore.Core.Models;
+using RockCore.Core.Services;
 
 namespace RockCore.Infrastructure.Services;
 
@@ -88,14 +89,23 @@ public class SpecificationService : ISpecificationService
             changed = true;
         }
 
-        // 如果 F.0.4 表缺失，或存在旧版 5 行数据（与阶段三逻辑不一致），则重置为新的 7 行默认值
-        var expectedKeys = new[] { "Intact", "RelativelyIntact", "RelativelyIntact", "Poor", "Poor", "RelativelyBroken", "Broken" };
-        bool criteriaMissing = config.IntegrityLevelCriteria == null || config.IntegrityLevelCriteria.Count == 0;
-        bool criteriaOutdated = !criteriaMissing && !expectedKeys.SequenceEqual(config.IntegrityLevelCriteria!.Select(c => c.LevelKey));
-
-        if (criteriaMissing || criteriaOutdated)
+        // F.0.4 完整程度划分表：
+        //   1) 配置缺失（空）时填充默认值；
+        //   2) 用户已修改的判定表绝不覆盖（行序 = 优先级，尊重用户设置）；
+        //   3) 定向迁移：旧版默认表（破碎行在末尾）迁移为新行序（破碎行置顶），
+        //      保持"间距<2cm → 破碎"的最高优先级与历史行为一致。
+        if (config.IntegrityLevelCriteria == null || config.IntegrityLevelCriteria.Count == 0)
         {
-            config.IntegrityLevelCriteria = GetDefaultIntegrityLevelCriteria();
+            config.IntegrityLevelCriteria = IntegrityCriteriaEngine.GetDefaultCriteria();
+            changed = true;
+        }
+        else if (IsLegacyDefaultCriteria(config.IntegrityLevelCriteria))
+        {
+            // 旧默认表：将末行（Broken, —, <2）移到表首
+            var rows = config.IntegrityLevelCriteria;
+            var last = rows[rows.Count - 1];
+            rows.RemoveAt(rows.Count - 1);
+            rows.Insert(0, last);
             changed = true;
         }
 
@@ -103,18 +113,35 @@ public class SpecificationService : ISpecificationService
             SaveConfig(config);
     }
 
-    private static List<IntegrityLevelCriterion> GetDefaultIntegrityLevelCriteria()
+    /// <summary>
+    /// 判断判定表是否为旧版默认表（7 行，破碎行在末尾）。
+    /// 仅当与旧默认表逐行完全一致时返回 true，避免误伤用户自定义表。
+    /// </summary>
+    private static bool IsLegacyDefaultCriteria(List<IntegrityLevelCriterion> criteria)
     {
-        return new List<IntegrityLevelCriterion>
+        if (criteria.Count != 7) return false;
+
+        var expected = new (string Level, string J, string S)[]
         {
-            new() { LevelKey = "Intact", JointSetCount = "1~2", JointSpacing = ">95", JointDevelopment = "不发育" },
-            new() { LevelKey = "RelativelyIntact", JointSetCount = "1~2", JointSpacing = "50~95", JointDevelopment = "轻度发育" },
-            new() { LevelKey = "RelativelyIntact", JointSetCount = "2~3", JointSpacing = "30~50", JointDevelopment = "中等发育" },
-            new() { LevelKey = "Poor", JointSetCount = "2~3", JointSpacing = "10~30", JointDevelopment = "较发育" },
-            new() { LevelKey = "Poor", JointSetCount = "2~3", JointSpacing = "≤10", JointDevelopment = "发育" },
-            new() { LevelKey = "RelativelyBroken", JointSetCount = ">3", JointSpacing = "≤10", JointDevelopment = "很发育" },
-            new() { LevelKey = "Broken", JointSetCount = "—", JointSpacing = "<2", JointDevelopment = "——" }
+            ("Intact",           "1~2", ">95"),
+            ("RelativelyIntact", "1~2", "50~95"),
+            ("RelativelyIntact", "2~3", "30~50"),
+            ("Poor",             "2~3", "10~30"),
+            ("Poor",             "2~3", "≤10"),
+            ("RelativelyBroken", ">3",  "≤10"),
+            ("Broken",           "—",   "<2")
         };
+
+        for (int i = 0; i < 7; i++)
+        {
+            var c = criteria[i];
+            if (string.Equals(c.LevelKey, expected[i].Level, StringComparison.OrdinalIgnoreCase)
+                && string.Equals((c.JointSetCount ?? "").Trim(), expected[i].J, StringComparison.OrdinalIgnoreCase)
+                && string.Equals((c.JointSpacing ?? "").Trim(), expected[i].S, StringComparison.OrdinalIgnoreCase))
+                continue;
+            return false;
+        }
+        return true;
     }
 
     public void SaveConfig(RockSpecificationConfig config)
@@ -168,8 +195,8 @@ public class SpecificationService : ISpecificationService
         config.Terminology["Broken"] = "破碎";
 
         // 岩体完整程度划分表 F.0.4
-        // 按阶段三实际判定逻辑（RuleEngineImageAnalyzer.JudgeSegmentDouble）对应：
-        config.IntegrityLevelCriteria = GetDefaultIntegrityLevelCriteria();
+        // 使用 Core 层统一的默认判定表（与 RuleEngineImageAnalyzer 判定逻辑一致）：
+        config.IntegrityLevelCriteria = IntegrityCriteriaEngine.GetDefaultCriteria();
 
         return config;
     }

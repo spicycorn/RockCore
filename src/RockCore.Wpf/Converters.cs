@@ -82,11 +82,10 @@ public class DepthDiffConverter : IValueConverter
     }
 }
 
-// 辅助类：提供岩质类型下拉选项
+// 辅助类：提供岩质类型下拉选项（含"未设置"，允许用户清除选择）
 public static class RockTypeHelper
 {
-    public static RockType[] Values { get; } = Enum.GetValues<RockType>()
-        .Where(v => v != RockType.NotSet).ToArray();
+    public static RockType[] Values { get; } = Enum.GetValues<RockType>().ToArray();
 }
 
 // 辅助类：提供完整性等级下拉选项

@@ -11,7 +11,7 @@ public class CorePhoto
     public double DepthStart { get; set; }
     public double DepthEnd { get; set; }
     public int BoxNumber { get; set; }
-    public IntegrityLevel IntegrityLevel { get; set; } = IntegrityLevel.UserOverride;
+    public IntegrityLevel IntegrityLevel { get; set; } = IntegrityLevel.Unknown;
     public double IntegrityIndex { get; set; }
     public double RQD { get; set; }
     public int JointCount { get; set; }

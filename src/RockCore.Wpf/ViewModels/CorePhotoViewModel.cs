@@ -28,7 +28,7 @@ public partial class CorePhotoViewModel : ObservableObject
     private int _boxNumber;
 
     [ObservableProperty]
-    private IntegrityLevel _integrityLevel = IntegrityLevel.UserOverride;
+    private IntegrityLevel _integrityLevel = IntegrityLevel.Unknown;
 
     [ObservableProperty]
     private double _integrityIndex;

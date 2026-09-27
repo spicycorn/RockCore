@@ -425,7 +425,7 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
                                                                 <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding DepthEnd, Converter={StaticResource DepthDiffConverter}}" Width="65" IsReadOnly="True"/>
+                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
                                                                 <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
                                                                     <DataGridComboBoxColumn.ElementStyle>
                                                                         <Style TargetType="ComboBox">
@@ -617,7 +617,7 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
                                                                 <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding DepthEnd, Converter={StaticResource DepthDiffConverter}}" Width="65" IsReadOnly="True"/>
+                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
                                                                 <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
                                                                     <DataGridComboBoxColumn.ElementStyle>
                                                                         <Style TargetType="ComboBox">
@@ -809,7 +809,7 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
                                                                 <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding DepthEnd, Converter={StaticResource DepthDiffConverter}}" Width="65" IsReadOnly="True"/>
+                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
                                                                 <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
                                                                     <DataGridComboBoxColumn.ElementStyle>
                                                                         <Style TargetType="ComboBox">
@@ -1001,7 +1001,7 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
                                                                 <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding DepthEnd, Converter={StaticResource DepthDiffConverter}}" Width="65" IsReadOnly="True"/>
+                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
                                                                 <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
                                                                     <DataGridComboBoxColumn.ElementStyle>
                                                                         <Style TargetType="ComboBox">
@@ -1193,7 +1193,7 @@
                                                             <DataGrid.Columns>
                                                                 <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
                                                                 <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding DepthEnd, Converter={StaticResource DepthDiffConverter}}" Width="65" IsReadOnly="True"/>
+                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
                                                                 <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
                                                                     <DataGridComboBoxColumn.ElementStyle>
                                                                         <Style TargetType="ComboBox">
@@ -1722,13 +1722,22 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
                                         <TextBlock Grid.Row="0" Text="项目围岩统计" FontWeight="Bold" Margin="0,0,0,8" Foreground="#333"/>
-                                        <TextBlock Grid.Row="1" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="#1565C0">
-                                            <TextBlock.Text>
-                                                <MultiBinding StringFormat="总的围岩初步分类：{0}">
-                                                    <Binding Path="ProjectStatistics.OverallClassSummary"/>
-                                                </MultiBinding>
-                                            </TextBlock.Text>
-                                        </TextBlock>
+                                        <StackPanel Grid.Row="1" Margin="0,0,0,8">
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#1565C0">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="围岩初步分类（按钻孔总深度）：{0}">
+                                                        <Binding Path="ProjectStatistics.OverallClassSummary"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#1565C0" Margin="0,2,0,0">
+                                                <TextBlock.Text>
+                                                    <MultiBinding StringFormat="围岩初步分类（按已分析长度）：{0}">
+                                                        <Binding Path="ProjectStatistics.OverallClassSummaryByAnalyzed"/>
+                                                    </MultiBinding>
+                                                </TextBlock.Text>
+                                            </TextBlock>
+                                        </StackPanel>
                                         <TextBlock Grid.Row="2" Margin="0,0,0,8">
                                             <TextBlock.Text>
                                                 <MultiBinding StringFormat="岩芯总长度：{0:F2}m，已分类：{1:F2}m，未分类：{2:F2}m">
@@ -1747,7 +1756,8 @@
                                             <DataGrid.Columns>
                                                 <DataGridTextColumn Header="围岩类别" Binding="{Binding ClassDescription}" Width="80"/>
                                                 <DataGridTextColumn Header="累计长度(m)" Binding="{Binding TotalLength, StringFormat='{}{0:F2}'}" Width="100"/>
-                                                <DataGridTextColumn Header="占比" Binding="{Binding Ratio, StringFormat='{}{0:P1}'}" Width="80"/>
+                                                <DataGridTextColumn Header="占比(按总深度)" Binding="{Binding Ratio, StringFormat='{}{0:P1}'}" Width="100"/>
+                                                <DataGridTextColumn Header="占比(按分析长)" Binding="{Binding RatioByAnalyzed, StringFormat='{}{0:P1}'}" Width="100"/>
                                                 <DataGridTextColumn Header="涉及钻孔数" Binding="{Binding BoreholeCount}" Width="90"/>
                                                 <DataGridTextColumn Header="深度分布(m)" Binding="{Binding DepthRangeText}" Width="2*"/>
                                             </DataGrid.Columns>
@@ -1757,14 +1767,24 @@
                                         <ItemsControl Grid.Row="5" ItemsSource="{Binding ProjectStatistics.BoreholeStats}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Margin="0,2">
-                                                        <TextBlock.Text>
-                                                            <MultiBinding StringFormat="{}{0}围岩分类：{1}">
-                                                                <Binding Path="BoreholeNumber"/>
-                                                                <Binding Path="ClassSummary"/>
-                                                            </MultiBinding>
-                                                        </TextBlock.Text>
-                                                    </TextBlock>
+                                                    <StackPanel Margin="0,2">
+                                                        <TextBlock>
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0}围岩分类（按总深度）：{1}">
+                                                                    <Binding Path="BoreholeNumber"/>
+                                                                    <Binding Path="ClassSummary"/>
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                        <TextBlock FontSize="12" Foreground="#666">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0}围岩分类（按分析长）：{1}">
+                                                                    <Binding Path="BoreholeNumber"/>
+                                                                    <Binding Path="ClassSummaryByAnalyzed"/>
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                    </StackPanel>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
