@@ -163,9 +163,9 @@ public class TerminologyItem
 public class IntegrityCriterionRow : INotifyPropertyChanged
 {
     private IntegrityLevel _levelKey;
-    private string _jointSetCount;
-    private string _jointSpacing;
-    private string _jointDevelopment;
+    private string _jointSetCount = string.Empty;
+    private string _jointSpacing = string.Empty;
+    private string _jointDevelopment = string.Empty;
 
     public IntegrityLevel LevelKey
     {

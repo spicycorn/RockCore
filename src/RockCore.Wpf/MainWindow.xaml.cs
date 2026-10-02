@@ -69,14 +69,23 @@ public partial class MainWindow : Window
         }
         else if (e.NewValue is BoreholeViewModel boreholeVm)
         {
-            _viewModel.SelectedBorehole = boreholeVm;
-            await _viewModel.LoadCorePhotosForSelectedBoreholeAsync();
-            await _viewModel.LoadBoreholeIntegritySegmentsAsync();
-            await _viewModel.LoadClassificationSegmentsAsync();
-            _viewModel.LoadAnalyzedPhotos();
-            // 刷新完整性卡片DataGrids
-            RefreshIntegrityGrids();
+            await SelectBoreholeAndLoadAsync(boreholeVm);
         }
+    }
+
+    /// <summary>
+    /// 选中钻孔并加载其全部关联数据（照片/完整性分段/分类/已分析照片），
+    /// 并刷新完整性卡片网格。所有"选中钻孔"的入口统一走这里，避免行为不一致。
+    /// </summary>
+    private async Task SelectBoreholeAndLoadAsync(BoreholeViewModel boreholeVm)
+    {
+        _viewModel.SelectedBorehole = boreholeVm;
+        await _viewModel.LoadCorePhotosForSelectedBoreholeAsync();
+        await _viewModel.LoadBoreholeIntegritySegmentsAsync();
+        await _viewModel.LoadClassificationSegmentsAsync();
+        _viewModel.LoadAnalyzedPhotos();
+        // 刷新完整性卡片DataGrids
+        RefreshIntegrityGrids();
     }
 
     private async void NewProject_Click(object sender, RoutedEventArgs e)
@@ -108,6 +117,7 @@ public partial class MainWindow : Window
         if (result == MessageBoxResult.Yes)
         {
             await _viewModel.DeleteProjectCommand.ExecuteAsync(null);
+            RefreshIntegrityGrids();
         }
     }
 
@@ -125,6 +135,7 @@ public partial class MainWindow : Window
         if (result == MessageBoxResult.Yes)
         {
             await _viewModel.DeleteBoreholeCommand.ExecuteAsync(null);
+            RefreshIntegrityGrids();
         }
     }
 
@@ -164,31 +175,26 @@ public partial class MainWindow : Window
         MainTabControl.SelectedIndex = 1;
     }
 
-    private void SelectBorehole_Click(object sender, RoutedEventArgs e)
+    private async void SelectBorehole_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button button && button.Tag is BoreholeViewModel boreholeVm)
         {
-            _viewModel.SelectedBorehole = boreholeVm;
+            await SelectBoreholeAndLoadAsync(boreholeVm);
             MainTabControl.SelectedIndex = 1;
         }
     }
 
-    private void BoreholeItem_Click(object sender, MouseButtonEventArgs e)
+    private async void BoreholeItem_Click(object sender, MouseButtonEventArgs e)
     {
         if (sender is Border border && border.DataContext is BoreholeViewModel boreholeVm)
         {
-            _viewModel.SelectedBorehole = boreholeVm;
+            await SelectBoreholeAndLoadAsync(boreholeVm);
         }
     }
 
     private void ImportPhotos_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.SelectedProject == null)
-        {
-            MessageBox.Show("请先选择项目", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-
+        // 与工具栏「导入照片」按钮保持一致：只需选中钻孔（选中钻孔必然已选中其所属项目）
         if (_viewModel.SelectedBorehole == null)
         {
             MessageBox.Show("请先选择钻孔", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -201,6 +207,65 @@ public partial class MainWindow : Window
     private void ExportReport_Click(object sender, RoutedEventArgs e)
     {
         MessageBox.Show("报告导出功能 - 阶段7后实现", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>
+    /// 保存单张照片的标注分析结果（照片字段 + 结构面 + 分析指标）。
+    /// 供「单张分析 / 批量分析 / 重新标注」三处共用，避免重复代码。
+    /// 返回 true 表示保存成功；失败时仅记录日志，由调用方决定如何向用户提示。
+    /// </summary>
+    private async Task<bool> SaveAnalysisResultAsync(CorePhotoViewModel photo, ImageAnalysisResult analysisResult)
+    {
+        try
+        {
+            int photoId = photo.Id;
+            photo.IntegrityLevel = analysisResult.IntegrityLevel;
+            photo.JointCount = analysisResult.JointCount;
+            photo.AvgJointSpacingCm = analysisResult.AvgJointSpacingCm;
+            photo.AnalysisStatus = "已分析";
+            photo.IsUserModified = true;
+            photo.AnalysisResultJson = System.Text.Json.JsonSerializer.Serialize(analysisResult);
+
+            await _viewModel.CorePhotoRepository.UpdateAsync(photo.ToModel());
+
+            // 删除旧的结构面数据后写入新数据
+            await _structuralPlaneRepository.DeleteByCorePhotoIdAsync(photoId);
+            if (analysisResult.StructuralPlanes.Count > 0)
+            {
+                foreach (var plane in analysisResult.StructuralPlanes)
+                {
+                    plane.CorePhotoId = photoId;
+                    plane.CreatedAt = DateTime.Now;
+                }
+                await _structuralPlaneRepository.AddRangeAsync(analysisResult.StructuralPlanes);
+            }
+
+            // 删除旧的指标数据后写入新数据
+            await _analysisMetricsRepository.DeleteByCorePhotoIdAsync(photoId);
+            string integrityText = analysisResult.IntegrityLevel switch
+            {
+                Core.Enums.IntegrityLevel.Unknown => "未评定",
+                Core.Enums.IntegrityLevel.Intact => "完整",
+                Core.Enums.IntegrityLevel.RelativelyIntact => "较完整",
+                Core.Enums.IntegrityLevel.Poor => "完整性差",
+                Core.Enums.IntegrityLevel.RelativelyBroken => "较破碎",
+                Core.Enums.IntegrityLevel.Broken => "破碎",
+                _ => analysisResult.IntegrityLevel.ToString()
+            };
+            var metrics = new List<AnalysisMetrics>
+            {
+                new() { CorePhotoId = photoId, MetricKey = "岩体完整程度", MetricValue = integrityText, MetricUnit = string.Empty, CreatedAt = DateTime.Now },
+                new() { CorePhotoId = photoId, MetricKey = "结构面发育程度", MetricValue = analysisResult.StructuralDevelopment, MetricUnit = string.Empty, CreatedAt = DateTime.Now }
+            };
+            await _analysisMetricsRepository.AddRangeAsync(metrics);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"[RockCore] 保存分析结果失败（{photo.FileName}）: {ex.Message}");
+            return false;
+        }
     }
 
     private async void AnalyzeSinglePhoto_Click(object sender, RoutedEventArgs e)
@@ -244,56 +309,11 @@ public partial class MainWindow : Window
 
         var analysisResult = annotationWindow.Result;
 
-        // --- 保存到 ViewModel 及数据库 ---
-        var photoId = selected.Id;
+        // --- 保存到数据库（共用辅助方法）---
         var fileName = selected.FileName;
-
-        selected.IntegrityLevel = analysisResult.IntegrityLevel;
-        selected.JointCount = analysisResult.JointCount;
-        selected.AvgJointSpacingCm = analysisResult.AvgJointSpacingCm;
-        selected.AnalysisStatus = "已分析";
-        selected.IsUserModified = true;  // 人工标注结果，视为用户修正
-        selected.AnalysisResultJson = System.Text.Json.JsonSerializer.Serialize(analysisResult);
-
-        var model = selected.ToModel();
-
-        // --- 保存到数据库（同步等待完成，确保数据持久化）---
-        try
+        if (!await SaveAnalysisResultAsync(selected, analysisResult))
         {
-            await _viewModel.CorePhotoRepository.UpdateAsync(model);
-            await _structuralPlaneRepository.DeleteByCorePhotoIdAsync(photoId);
-            if (analysisResult.StructuralPlanes.Count > 0)
-            {
-                foreach (var plane in analysisResult.StructuralPlanes)
-                {
-                    plane.CorePhotoId = photoId;
-                    plane.CreatedAt = DateTime.Now;
-                }
-                await _structuralPlaneRepository.AddRangeAsync(analysisResult.StructuralPlanes);
-            }
-
-            await _analysisMetricsRepository.DeleteByCorePhotoIdAsync(photoId);
-            string metricsIntegrityText = analysisResult.IntegrityLevel switch
-            {
-                Core.Enums.IntegrityLevel.Unknown => "未评定",
-                Core.Enums.IntegrityLevel.Intact => "完整",
-                Core.Enums.IntegrityLevel.RelativelyIntact => "较完整",
-                Core.Enums.IntegrityLevel.Poor => "完整性差",
-                Core.Enums.IntegrityLevel.RelativelyBroken => "较破碎",
-                Core.Enums.IntegrityLevel.Broken => "破碎",
-                _ => analysisResult.IntegrityLevel.ToString()
-            };
-            var metrics = new List<AnalysisMetrics>
-            {
-                new() { CorePhotoId = photoId, MetricKey = "岩体完整程度", MetricValue = metricsIntegrityText, MetricUnit = string.Empty, CreatedAt = DateTime.Now },
-                new() { CorePhotoId = photoId, MetricKey = "结构面发育程度", MetricValue = analysisResult.StructuralDevelopment, MetricUnit = string.Empty, CreatedAt = DateTime.Now }
-            };
-            await _analysisMetricsRepository.AddRangeAsync(metrics);
-        }
-        catch (Exception dbEx)
-        {
-            System.Diagnostics.Trace.WriteLine($"保存分析结果失败: {dbEx.Message}");
-            MessageBox.Show($"保存分析结果失败: {dbEx.Message}", "保存错误", 
+            MessageBox.Show("保存分析结果失败，详情请查看日志。", "保存错误",
                 MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
@@ -393,59 +413,15 @@ public partial class MainWindow : Window
             }
 
             var analysisResult = win.Result;
-            int photoId = photo.Id;
 
-            // 保存到数据库（完整保存，包含结构面和指标）
-            try
+            // 保存到数据库（共用辅助方法）
+            if (await SaveAnalysisResultAsync(photo, analysisResult))
             {
-                photo.IntegrityLevel = analysisResult.IntegrityLevel;
-                photo.JointCount = analysisResult.JointCount;
-                photo.AvgJointSpacingCm = analysisResult.AvgJointSpacingCm;
-                photo.AnalysisStatus = "已分析";
-                photo.IsUserModified = true;
-                photo.AnalysisResultJson = System.Text.Json.JsonSerializer.Serialize(analysisResult);
-
-                var model = photo.ToModel();
-
-                await _viewModel.CorePhotoRepository.UpdateAsync(model);
-                
-                // 删除旧的结构面数据
-                await _structuralPlaneRepository.DeleteByCorePhotoIdAsync(photoId);
-                if (analysisResult.StructuralPlanes.Count > 0)
-                {
-                    foreach (var plane in analysisResult.StructuralPlanes)
-                    {
-                        plane.CorePhotoId = photoId;
-                        plane.CreatedAt = DateTime.Now;
-                    }
-                    await _structuralPlaneRepository.AddRangeAsync(analysisResult.StructuralPlanes);
-                }
-
-                // 删除旧的指标数据
-                await _analysisMetricsRepository.DeleteByCorePhotoIdAsync(photoId);
-                string batchIntegrityText = analysisResult.IntegrityLevel switch
-                {
-                    Core.Enums.IntegrityLevel.Unknown => "未评定",
-                    Core.Enums.IntegrityLevel.Intact => "完整",
-                    Core.Enums.IntegrityLevel.RelativelyIntact => "较完整",
-                    Core.Enums.IntegrityLevel.Poor => "完整性差",
-                    Core.Enums.IntegrityLevel.RelativelyBroken => "较破碎",
-                    Core.Enums.IntegrityLevel.Broken => "破碎",
-                    _ => analysisResult.IntegrityLevel.ToString()
-                };
-                var batchMetrics = new List<AnalysisMetrics>
-                {
-                    new() { CorePhotoId = photoId, MetricKey = "岩体完整程度", MetricValue = batchIntegrityText, MetricUnit = string.Empty, CreatedAt = DateTime.Now },
-                    new() { CorePhotoId = photoId, MetricKey = "结构面发育程度", MetricValue = analysisResult.StructuralDevelopment, MetricUnit = string.Empty, CreatedAt = DateTime.Now }
-                };
-                await _analysisMetricsRepository.AddRangeAsync(batchMetrics);
-                
                 successCount++;
             }
-            catch (Exception ex)
+            else if (firstFailedName == null)
             {
-                if (firstFailedName == null)
-                    firstFailedName = photo.FileName + "（保存异常：" + ex.Message + "）";
+                firstFailedName = photo.FileName + "（保存失败，详情见日志）";
             }
         }
 
@@ -488,59 +464,14 @@ public partial class MainWindow : Window
             return;
 
         var analysisResult = win.Result;
-        int photoId = selected.Id;
 
-        try
+        if (!await SaveAnalysisResultAsync(selected, analysisResult))
         {
-            selected.IntegrityLevel = analysisResult.IntegrityLevel;
-            selected.JointCount = analysisResult.JointCount;
-            selected.AvgJointSpacingCm = analysisResult.AvgJointSpacingCm;
-            selected.AnalysisStatus = "已分析";
-            selected.IsUserModified = true;
-            selected.AnalysisResultJson = System.Text.Json.JsonSerializer.Serialize(analysisResult);
-
-            var model = selected.ToModel();
-
-            await _viewModel.CorePhotoRepository.UpdateAsync(model);
-            
-            // 删除旧的结构面数据
-            await _structuralPlaneRepository.DeleteByCorePhotoIdAsync(photoId);
-            if (analysisResult.StructuralPlanes.Count > 0)
-            {
-                foreach (var plane in analysisResult.StructuralPlanes)
-                {
-                    plane.CorePhotoId = photoId;
-                    plane.CreatedAt = DateTime.Now;
-                }
-                await _structuralPlaneRepository.AddRangeAsync(analysisResult.StructuralPlanes);
-            }
-
-            // 删除旧的指标数据
-            await _analysisMetricsRepository.DeleteByCorePhotoIdAsync(photoId);
-            string metricsIntegrityText = analysisResult.IntegrityLevel switch
-            {
-                Core.Enums.IntegrityLevel.Unknown => "未评定",
-                Core.Enums.IntegrityLevel.Intact => "完整",
-                Core.Enums.IntegrityLevel.RelativelyIntact => "较完整",
-                Core.Enums.IntegrityLevel.Poor => "完整性差",
-                Core.Enums.IntegrityLevel.RelativelyBroken => "较破碎",
-                Core.Enums.IntegrityLevel.Broken => "破碎",
-                _ => analysisResult.IntegrityLevel.ToString()
-            };
-            var metrics = new List<AnalysisMetrics>
-            {
-                new() { CorePhotoId = photoId, MetricKey = "岩体完整程度", MetricValue = metricsIntegrityText, MetricUnit = string.Empty, CreatedAt = DateTime.Now },
-                new() { CorePhotoId = photoId, MetricKey = "结构面发育程度", MetricValue = analysisResult.StructuralDevelopment, MetricUnit = string.Empty, CreatedAt = DateTime.Now }
-            };
-            await _analysisMetricsRepository.AddRangeAsync(metrics);
-            
-            _viewModel.LoadAnalyzedPhotos();
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show("保存重新标注结果时出错：" + ex.Message,
+            MessageBox.Show("保存重新标注结果时出错，详情请查看日志。",
                 "错误", MessageBoxButton.OK, MessageBoxImage.Error);
         }
+
+        _viewModel.LoadAnalyzedPhotos();
     }
 
     private void ViewCoreEditor_Click(object sender, RoutedEventArgs e)
@@ -565,8 +496,16 @@ public partial class MainWindow : Window
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
+        // 版本号从程序集读取（在 csproj 的 <Version> 中统一维护），避免硬编码导致与实际版本不一致
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        string versionText = "1.0.1";
+        if (v != null)
+            versionText = v.Revision == 0
+                ? $"{v.Major}.{v.Minor}.{v.Build}"
+                : v.ToString();
+
         MessageBox.Show(
-            "RockCore 岩芯围岩评价软件 v1.0\n\n" +
+            $"RockCore 岩芯围岩评价软件 v{versionText}\n\n" +
             "适用于 DL/T 5894-2025《压气储能电站工程地质勘察规范》\n\n" +
             "压缩空气储能电站岩芯围岩类别评价",
             "关于", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -699,6 +638,8 @@ public partial class MainWindow : Window
                 _viewModel.SelectedBorehole.TotalDepth = maxDepth.Value;
                 await App.Services.GetRequiredService<IBoreholeRepository>()
                     .UpdateAsync(_viewModel.SelectedBorehole.ToModel());
+                // 孔深已变化，通知三维视图需要重新生成场景
+                _viewModel.NotifyBoreholeSaved();
             }
 
             await _viewModel.LoadCorePhotosForSelectedBoreholeAsync();

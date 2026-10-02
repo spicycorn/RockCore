@@ -75,6 +75,7 @@ public partial class ThreeDimViewModel : ObservableObject
             SelectedBorehole = bh;
 
         _mainViewModel.PropertyChanged += OnMainViewModelPropertyChanged;
+        _mainViewModel.BoreholeSaved += OnBoreholeSaved;
         UpdateLegendItems();
     }
 
@@ -87,22 +88,23 @@ public partial class ThreeDimViewModel : ObservableObject
             {
                 bool idChanged = vm.Id != SelectedBorehole?.Id;
                 SelectedBorehole = vm;
-                
+
                 if (idChanged)
                 {
                     NeedsRegeneration = false;
                 }
             }
         }
-        else if (e.PropertyName == nameof(MainViewModel.BoreholeUpdated))
+    }
+
+    private void OnBoreholeSaved(object? sender, EventArgs e)
+    {
+        var vm = _mainViewModel.SelectedBorehole?.ToModel();
+        if (vm != null && vm.Id == SelectedBorehole?.Id)
         {
-            var vm = _mainViewModel.SelectedBorehole?.ToModel();
-            if (vm != null && vm.Id == SelectedBorehole?.Id)
-            {
-                SelectedBorehole = vm;
-                NeedsRegeneration = true;
-                StatusMessage = "钻孔信息已更新，请重新生成三维场景";
-            }
+            SelectedBorehole = vm;
+            NeedsRegeneration = true;
+            StatusMessage = "钻孔信息已更新，请重新生成三维场景";
         }
     }
 

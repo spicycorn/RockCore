@@ -20,11 +20,17 @@ public class RockCoreDbContext : IDisposable
         if (_connection == null)
         {
             _connection = new SqliteConnection(_connectionString);
-            _connection.Open();
         }
-        else if (_connection.State != System.Data.ConnectionState.Open)
+        if (_connection.State != System.Data.ConnectionState.Open)
         {
             _connection.Open();
+            // SQLite 默认不启用外键约束，必须对每个连接显式开启，
+            // 否则 schema 中的 ON DELETE CASCADE 不会生效（删除父记录会留下孤儿子记录）。
+            using (var cmd = _connection.CreateCommand())
+            {
+                cmd.CommandText = "PRAGMA foreign_keys = ON;";
+                cmd.ExecuteNonQuery();
+            }
         }
         return _connection;
     }

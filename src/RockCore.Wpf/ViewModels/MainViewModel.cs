@@ -31,8 +31,16 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private BoreholeViewModel? _selectedBorehole;
 
-    [ObservableProperty]
-    private bool _boreholeUpdated;
+    /// <summary>
+    /// 钻孔信息保存后触发，通知订阅者（如三维视图）需要重新生成场景。
+    /// 使用事件而非"翻转 bool"的方式，语义更清晰且不依赖属性变更检测。
+    /// </summary>
+    public event EventHandler? BoreholeSaved;
+
+    /// <summary>
+    /// 触发 BoreholeSaved 事件。供"保存钻孔"与"导入照片后孔深变化"等入口统一调用。
+    /// </summary>
+    public void NotifyBoreholeSaved() => BoreholeSaved?.Invoke(this, EventArgs.Empty);
 
     [ObservableProperty]
     private string _statusMessage = "就绪";
@@ -778,7 +786,28 @@ public partial class MainViewModel : ObservableObject
         await _projectRepository.DeleteAsync(SelectedProject.Id);
         Projects.Remove(SelectedProject);
         SelectedProject = null;
+        SelectedBorehole = null;
+        ClearBoreholeData();
         StatusMessage = "已删除项目";
+    }
+
+    /// <summary>
+    /// 清空所有与"当前钻孔"绑定的界面数据集合，
+    /// 避免删除钻孔/项目后网格仍显示已删除钻孔的旧数据。
+    /// </summary>
+    private void ClearBoreholeData()
+    {
+        BoreholeIntegritySegments.Clear();
+        IntegritySegments.Clear();
+        DevelopmentSegments.Clear();
+        ClassificationSegments.Clear();
+        AnalyzedPhotos.Clear();
+        StructuralPlanes.Clear();
+        AnalysisMetricsList.Clear();
+        AnnotatedImage = null;
+        AnnotatedImagePath = string.Empty;
+        CurrentBoreholeClassSummary = string.Empty;
+        AnalysisDetail = string.Empty;
     }
 
     [RelayCommand]
@@ -812,6 +841,7 @@ public partial class MainViewModel : ObservableObject
         await _boreholeRepository.DeleteAsync(SelectedBorehole.Id);
         SelectedProject.Boreholes.Remove(SelectedBorehole);
         SelectedBorehole = null;
+        ClearBoreholeData();
         StatusMessage = "已删除钻孔";
     }
 
@@ -842,7 +872,7 @@ public partial class MainViewModel : ObservableObject
         await LoadBoreholeIntegritySegmentsAsync();
         LoadAnalyzedPhotos();
 
-        BoreholeUpdated = !BoreholeUpdated;
+        NotifyBoreholeSaved();
         StatusMessage = "钻孔已保存";
     }
 
