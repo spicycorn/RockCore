@@ -465,7 +465,8 @@ public class ExcelImportService
     private static double? ReadDouble(IXLCell cell)
     {
         if (cell.IsEmpty()) return null;
-        if (cell.Type == XLCellValues.Number) return cell.GetValue<double>();
+        // ClosedXML 0.100+：单元格类型属性为 DataType（XLDataType 枚举）
+        if (cell.DataType == XLDataType.Number) return cell.GetValue<double>();
         var text = cell.GetString().Trim();
         return double.TryParse(text, System.Globalization.NumberStyles.Float,
             System.Globalization.CultureInfo.InvariantCulture, out var v) ? v : null;
