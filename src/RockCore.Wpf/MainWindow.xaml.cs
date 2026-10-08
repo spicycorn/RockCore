@@ -11,6 +11,7 @@ using RockCore.Core.Interfaces;
 using RockCore.Core.Models;
 using RockCore.Core.Services;
 using RockCore.Infrastructure.ImageAnalysis;
+using RockCore.Infrastructure.Services;
 using RockCore.Wpf.ViewModels;
 
 namespace RockCore.Wpf;
@@ -24,6 +25,7 @@ public partial class MainWindow : Window
     private readonly IStructuralPlaneRepository _structuralPlaneRepository;
     private readonly IAnalysisMetricsRepository _analysisMetricsRepository;
     private readonly ImageAnnotationService _annotationService;
+    private readonly ExcelImportService _excelImportService;
 
     // 图像缩放和拖动相关字段
     private bool _isImageDragging = false;
@@ -38,7 +40,8 @@ public partial class MainWindow : Window
         RuleEngineImageAnalyzer ruleEngineAnalyzer,
         IStructuralPlaneRepository structuralPlaneRepository,
         IAnalysisMetricsRepository analysisMetricsRepository,
-        ImageAnnotationService annotationService)
+        ImageAnnotationService annotationService,
+        ExcelImportService excelImportService)
     {
         InitializeComponent();
         _viewModel = viewModel;
@@ -48,16 +51,36 @@ public partial class MainWindow : Window
         _structuralPlaneRepository = structuralPlaneRepository;
         _analysisMetricsRepository = analysisMetricsRepository;
         _annotationService = annotationService;
+        _excelImportService = excelImportService;
         DataContext = _viewModel;
 
         // 设置 ThreeDimView 的 DataContext，确保使用同一个 ViewModel 实例
         if (ThreeDimViewControl != null)
             ThreeDimViewControl.DataContext = _threeDimViewModel;
+
+        // 等级参数下拉：5 个完整性等级（按严重程度排序）
+        LevelSettingsCombo.ItemsSource = new[]
+        {
+            IntegrityLevel.Intact, IntegrityLevel.RelativelyIntact, IntegrityLevel.Poor,
+            IntegrityLevel.RelativelyBroken, IntegrityLevel.Broken
+        };
+        LevelSettingsCombo.SelectedIndex = 0;
     }
 
     private async void Window_Loaded(object sender, RoutedEventArgs e)
     {
+        VersionTextBlock.Text = $"RockCore v{GetVersionText()}";
         await _viewModel.LoadProjectsAsync();
+    }
+
+    /// <summary>
+    /// 从程序集读取版本号（csproj &lt;Version&gt; 统一维护），去掉末尾修订号 0（1.0.1.0 → 1.0.1）。
+    /// </summary>
+    private static string GetVersionText()
+    {
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        if (v == null) return "1.0.1";
+        return v.Revision == 0 ? $"{v.Major}.{v.Minor}.{v.Build}" : v.ToString();
     }
 
     private async void ProjectTree_SelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
@@ -319,6 +342,7 @@ public partial class MainWindow : Window
 
         // --- 更新 UI ---
         _viewModel.LoadAnalyzedPhotos();
+        UpdateWorkflowSteps();
         _viewModel.StatusMessage = $"人工标注完成: {fileName} - {analysisResult.IntegrityLevel}";
 
         string integrityText = analysisResult.IntegrityLevel switch
@@ -344,7 +368,7 @@ public partial class MainWindow : Window
             $"人工标注完成！\n\n" +
             $"分析器: 人工标注\n" +
             $"照片: {fileName}\n" +
-            $"岩芯段: {analysisResult.CorePieces.Count} 段\n" +
+            $"岩心段: {analysisResult.CorePieces.Count} 段\n" +
             $"节理数: {analysisResult.JointCount} 条\n" +
             $"平均间距: {(analysisResult.AvgJointSpacingCm > 0 ? $"{analysisResult.AvgJointSpacingCm:F1} cm" : "无比例尺")}\n" +
             $"岩体完整程度: {integrityText}\n" +
@@ -375,7 +399,7 @@ public partial class MainWindow : Window
         var dr = MessageBox.Show(
             "当前使用人工标注模式，不支持一键批量自动识别。\n\n" +
             "是否按顺序逐张打开标注窗口？\n" +
-            "（在每个照片中将比例尺、岩芯段、节理线手动框选，最后点击完成才会保存结果）",
+            "（在每个照片中将比例尺、岩心段、节理线手动框选，最后点击完成才会保存结果）",
             "批量标注提示", MessageBoxButton.OKCancel, MessageBoxImage.Information);
         if (dr != MessageBoxResult.OK) return;
 
@@ -426,6 +450,7 @@ public partial class MainWindow : Window
         }
 
         _viewModel.LoadAnalyzedPhotos();
+        UpdateWorkflowSteps();
         MessageBox.Show(
             $"批量标注完成。\n\n成功: {successCount} 张\n跳过/取消: {skipped} 张" +
             (firstFailedName != null ? $"\n\n首个问题: {firstFailedName}" : ""),
@@ -472,6 +497,7 @@ public partial class MainWindow : Window
         }
 
         _viewModel.LoadAnalyzedPhotos();
+        UpdateWorkflowSteps();
     }
 
     private void ViewCoreEditor_Click(object sender, RoutedEventArgs e)
@@ -497,17 +523,10 @@ public partial class MainWindow : Window
     private void About_Click(object sender, RoutedEventArgs e)
     {
         // 版本号从程序集读取（在 csproj 的 <Version> 中统一维护），避免硬编码导致与实际版本不一致
-        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-        string versionText = "1.0.1";
-        if (v != null)
-            versionText = v.Revision == 0
-                ? $"{v.Major}.{v.Minor}.{v.Build}"
-                : v.ToString();
-
         MessageBox.Show(
-            $"RockCore 岩芯围岩评价软件 v{versionText}\n\n" +
+            $"RockCore 岩心围岩评价软件 v{GetVersionText()}\n\n" +
             "适用于 DL/T 5894-2025《压气储能电站工程地质勘察规范》\n\n" +
-            "压缩空气储能电站岩芯围岩类别评价",
+            "压缩空气储能电站岩心围岩类别评价",
             "关于", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
@@ -643,6 +662,7 @@ public partial class MainWindow : Window
             }
 
             await _viewModel.LoadCorePhotosForSelectedBoreholeAsync();
+            UpdateWorkflowSteps();
         }
     }
 
@@ -909,71 +929,179 @@ public partial class MainWindow : Window
         }
     }
 
-    // 分段设置参数（每个完整性等级卡片的按钮触发）
-    private async void SegmentSettings_Click(object sender, RoutedEventArgs e)
+    // 等级参数：对下拉选中的完整性等级按深度区间批量设置参数
+    private async void LevelSettings_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is string tag &&
-            Enum.TryParse<IntegrityLevel>(tag, out var targetLevel))
+        if (LevelSettingsCombo.SelectedItem is not IntegrityLevel targetLevel)
         {
-            var dlg = new SegmentSettingsDialog(targetLevel);
-            if (dlg.ShowDialog() == true)
+            MessageBox.Show("请先选择完整性等级", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dlg = new SegmentSettingsDialog(targetLevel);
+        if (dlg.ShowDialog() == true)
+        {
+            int count = await _viewModel.ApplySettingsToDepthRangeAsync(
+                targetLevel, dlg.DepthStart, dlg.DepthEnd,
+                dlg.SelectedRockType, dlg.SelectedRockStructureType,
+                dlg.SelectedHardnessLevel, dlg.SelectedHomogeneity,
+                dlg.SelectedGroundwaterCondition, dlg.CaveAxisAngleLessThan30);
+
+            RefreshIntegrityGrids();
+
+            if (count == 0)
+                MessageBox.Show("在指定深度区间内未找到匹配的分段", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            else
+                _viewModel.StatusMessage = $"已更新 {count} 个分段的参数";
+        }
+    }
+
+    // ===== 完整性分段：统一表 + 等级筛选 =====
+
+    // 当前筛选等级（null = 全部）
+    private IntegrityLevel? _segmentFilterLevel;
+
+    /// <summary>
+    /// 刷新统一完整性分段表：绑定数据源、应用等级筛选、更新筛选 chip 汇总。
+    /// </summary>
+    private void RefreshIntegrityGrids()
+    {
+        SegmentsDataGrid.ItemsSource = _viewModel.BoreholeIntegritySegments;
+        ApplySegmentFilter();
+        UpdateTotalLengths();
+        UpdateWorkflowSteps();
+    }
+
+    // ===== 工作流步骤条 =====
+
+    private void WorkflowStep_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: string tag })
+        {
+            // 标签页索引：0 项目概览 / 1 岩心编辑器 / 2 分析结果 / 3 围岩分类 / 4 三维可视化 / 5 报告
+            MainTabControl.SelectedIndex = tag switch
             {
-                int count = await _viewModel.ApplySettingsToDepthRangeAsync(
-                    targetLevel, dlg.DepthStart, dlg.DepthEnd,
-                    dlg.SelectedRockType, dlg.SelectedRockStructureType,
-                    dlg.SelectedHardnessLevel, dlg.SelectedHomogeneity,
-                    dlg.SelectedGroundwaterCondition, dlg.CaveAxisAngleLessThan30);
+                "classify" => 3,
+                "3d" => 4,
+                _ => 1
+            };
+        }
+    }
 
+    /// <summary>
+    /// 根据当前钻孔数据状态刷新 4 个步骤的完成态显示。
+    /// ①导入数据（已有导入分段）→ ②分段填写（F.0.2 全填）→ ③围岩分类 → ④三维查看
+    /// </summary>
+    private void UpdateWorkflowSteps()
+    {
+        var hasSegments = _viewModel.BoreholeIntegritySegments.Count > 0;
+        bool segmentsFilled = hasSegments && _viewModel.BoreholeIntegritySegments.All(s =>
+            s.RockType != RockType.NotSet && s.RockStructureType != RockStructureType.NotSet);
+        bool classified = !string.IsNullOrEmpty(_viewModel.CurrentBoreholeClassSummary);
+
+        SetStepVisual(Step1Dot, Step1Num, Step1Label, hasSegments, 1);
+        SetStepVisual(Step2Dot, Step2Num, Step2Label, segmentsFilled, 2);
+        SetStepVisual(Step3Dot, Step3Num, Step3Label, classified, 3);
+        SetStepVisual(Step4Dot, Step4Num, Step4Label, false, 4); // 三维为查看动作，无完成态
+    }
+
+    private void SetStepVisual(Border dot, TextBlock num, TextBlock label, bool done, int index)
+    {
+        var primary = (Brush)FindResource("PrimaryBrush");
+        var gray = (Brush)FindResource("BorderLightBrush");
+        var textPrimary = (Brush)FindResource("TextPrimaryBrush");
+        var textSecondary = (Brush)FindResource("TextSecondaryBrush");
+
+        dot.Background = done ? primary : gray;
+        num.Text = done ? "✓" : index.ToString();
+        num.Foreground = done ? Brushes.White : textSecondary;
+        label.Foreground = done ? textPrimary : textSecondary;
+        label.FontWeight = done ? FontWeights.SemiBold : FontWeights.Normal;
+    }
+
+    // ===== 数据导入（Excel 模板 v4）=====
+
+    private async void ImportData_Click(object sender, RoutedEventArgs e)
+    {
+        var project = _viewModel.SelectedProject;
+        if (project == null)
+        {
+            MessageBox.Show(this, "请先在左侧选择项目", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var dialog = new ExcelImportDialogWindow(_excelImportService, project.Boreholes, _viewModel.SelectedBorehole)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() == true)
+        {
+            _viewModel.StatusMessage = $"已导入岩心数据表（钻孔 {dialog.ImportedBoreholeNumber}）";
+            if (dialog.ImportedBoreholeId != null &&
+                _viewModel.SelectedBorehole != null &&
+                dialog.ImportedBoreholeId == _viewModel.SelectedBorehole.Id)
+            {
+                await _viewModel.LoadBoreholeIntegritySegmentsAsync();
                 RefreshIntegrityGrids();
-
-                if (count == 0)
-                    MessageBox.Show("在指定深度区间内未找到匹配的分段", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
-                else
-                    _viewModel.StatusMessage = $"已更新 {count} 个分段的参数";
             }
         }
     }
 
-    // 刷新5个完整性卡片的DataGrid数据源
-    private void RefreshIntegrityGrids()
+    private async void DataSourceManager_Click(object sender, RoutedEventArgs e)
     {
-        CompleteSegmentsGrid.ItemsSource = null;
-        RelativelyCompleteSegmentsGrid.ItemsSource = null;
-        PoorIntegritySegmentsGrid.ItemsSource = null;
-        RelativelyFragmentedSegmentsGrid.ItemsSource = null;
-        FragmentedSegmentsGrid.ItemsSource = null;
+        var borehole = _viewModel.SelectedBorehole;
+        if (borehole == null)
+        {
+            MessageBox.Show(this, "请先在左侧选择钻孔", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
 
-        CompleteSegmentsGrid.ItemsSource = _viewModel.BoreholeIntegritySegments
-            .Where(s => s.IntegrityLevel == IntegrityLevel.Intact).ToList();
-        RelativelyCompleteSegmentsGrid.ItemsSource = _viewModel.BoreholeIntegritySegments
-            .Where(s => s.IntegrityLevel == IntegrityLevel.RelativelyIntact).ToList();
-        PoorIntegritySegmentsGrid.ItemsSource = _viewModel.BoreholeIntegritySegments
-            .Where(s => s.IntegrityLevel == IntegrityLevel.Poor).ToList();
-        RelativelyFragmentedSegmentsGrid.ItemsSource = _viewModel.BoreholeIntegritySegments
-            .Where(s => s.IntegrityLevel == IntegrityLevel.RelativelyBroken).ToList();
-        FragmentedSegmentsGrid.ItemsSource = _viewModel.BoreholeIntegritySegments
-            .Where(s => s.IntegrityLevel == IntegrityLevel.Broken).ToList();
-
-        // 更新累计长度显示
-        UpdateTotalLengths();
+        var dialog = new DataSourceManagerWindow(_excelImportService, borehole) { Owner = this };
+        dialog.ShowDialog();
+        if (dialog.DeletedAnything)
+        {
+            await _viewModel.LoadBoreholeIntegritySegmentsAsync();
+            RefreshIntegrityGrids();
+        }
     }
 
+    private void ApplySegmentFilter()
+    {
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_viewModel.BoreholeIntegritySegments);
+        if (view != null)
+        {
+            view.Filter = o => _segmentFilterLevel == null ||
+                               (o is BoreholeIntegritySegment s && s.IntegrityLevel == _segmentFilterLevel);
+        }
+    }
+
+    private void FilterChip_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is System.Windows.Controls.RadioButton { Tag: string tag })
+        {
+            _segmentFilterLevel = tag == "All" ? null : Enum.Parse<IntegrityLevel>(tag);
+            ApplySegmentFilter();
+        }
+    }
+
+    /// <summary>
+    /// 更新筛选 chip 上的分段数量与累计长度汇总。
+    /// </summary>
     private void UpdateTotalLengths()
     {
-        var complete = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == IntegrityLevel.Intact);
-        CompleteTotalLength.Text = complete.Any() ? $"共 {complete.Sum(s => s.DepthEnd - s.DepthStart):F1}m" : "";
+        ChipAll.Content = $"全部 {_viewModel.BoreholeIntegritySegments.Count}段";
+        ChipIntact.Content = FormatLevelChip(IntegrityLevel.Intact, "完整");
+        ChipRelativelyIntact.Content = FormatLevelChip(IntegrityLevel.RelativelyIntact, "较完整");
+        ChipPoor.Content = FormatLevelChip(IntegrityLevel.Poor, "完整性差");
+        ChipRelativelyBroken.Content = FormatLevelChip(IntegrityLevel.RelativelyBroken, "较破碎");
+        ChipBroken.Content = FormatLevelChip(IntegrityLevel.Broken, "破碎");
+    }
 
-        var relComplete = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == IntegrityLevel.RelativelyIntact);
-        RelativelyCompleteTotalLength.Text = relComplete.Any() ? $"共 {relComplete.Sum(s => s.DepthEnd - s.DepthStart):F1}m" : "";
-
-        var poor = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == IntegrityLevel.Poor);
-        PoorIntegrityTotalLength.Text = poor.Any() ? $"共 {poor.Sum(s => s.DepthEnd - s.DepthStart):F1}m" : "";
-
-        var relFrag = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == IntegrityLevel.RelativelyBroken);
-        RelativelyFragmentedTotalLength.Text = relFrag.Any() ? $"共 {relFrag.Sum(s => s.DepthEnd - s.DepthStart):F1}m" : "";
-
-        var frag = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == IntegrityLevel.Broken);
-        FragmentedTotalLength.Text = frag.Any() ? $"共 {frag.Sum(s => s.DepthEnd - s.DepthStart):F1}m" : "";
+    private string FormatLevelChip(IntegrityLevel level, string label)
+    {
+        var segs = _viewModel.BoreholeIntegritySegments.Where(s => s.IntegrityLevel == level).ToList();
+        if (segs.Count == 0) return label;
+        return $"{label} {segs.Count}段/{segs.Sum(s => s.DepthEnd - s.DepthStart):F1}m";
     }
 
     // 刷新分析结果（从图像分析结果Tab的工具栏按钮触发）
@@ -1016,14 +1144,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void SyncUItoViewModel()
     {
-        var grids = new[]
-        {
-            CompleteSegmentsGrid,
-            RelativelyCompleteSegmentsGrid,
-            PoorIntegritySegmentsGrid,
-            RelativelyFragmentedSegmentsGrid,
-            FragmentedSegmentsGrid
-        };
+        var grids = new[] { SegmentsDataGrid };
 
         foreach (var grid in grids)
         {
@@ -1094,14 +1215,7 @@ public partial class MainWindow : Window
         }
 
         // 结束所有 DataGrid 的编辑
-        var grids = new[]
-        {
-            CompleteSegmentsGrid,
-            RelativelyCompleteSegmentsGrid,
-            PoorIntegritySegmentsGrid,
-            RelativelyFragmentedSegmentsGrid,
-            FragmentedSegmentsGrid
-        };
+        var grids = new[] { SegmentsDataGrid };
 
         foreach (var grid in grids)
         {
@@ -1121,12 +1235,14 @@ public partial class MainWindow : Window
         SyncUItoViewModel();
 
         await _viewModel.SaveAllIntegritySegmentsCommand.ExecuteAsync(null);
+        UpdateWorkflowSteps();
     }
 
     // ===== 阶段五：围岩分类事件处理 =====
     private async void ClassifyBorehole_Click(object sender, RoutedEventArgs e)
     {
         await _viewModel.ClassifySelectedBoreholeCommand.ExecuteAsync(null);
+        UpdateWorkflowSteps();
     }
 
     private async void RefreshProjectStatistics_Click(object sender, RoutedEventArgs e)

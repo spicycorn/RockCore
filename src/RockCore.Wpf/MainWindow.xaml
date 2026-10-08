@@ -7,9 +7,9 @@
         xmlns:vm="clr-namespace:RockCore.Wpf.ViewModels"
         xmlns:view="clr-namespace:RockCore.Wpf.Views"
         mc:Ignorable="d"
-        Title="RockCore 岩芯围岩评价软件 v1.0"
-        Height="700" Width="1100"
-        MinHeight="500" MinWidth="800"
+        Title="RockCore 岩心围岩评价软件"
+        Height="800" Width="1280"
+        MinHeight="600" MinWidth="960"
         WindowStartupLocation="CenterScreen"
         Loaded="Window_Loaded">
 
@@ -32,13 +32,14 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Menu Bar -->
-        <Menu Grid.Row="0" Background="#F5F5F5">
+        <!-- Menu Bar（精简：视图切换由标签页承担，分析动作在照片区工具栏/右键菜单就地提供） -->
+        <Menu Grid.Row="0">
             <MenuItem Header="文件(_F)">
                 <MenuItem Header="新建项目" Click="NewProject_Click"/>
                 <MenuItem Header="保存" Click="Save_Click"/>
                 <Separator/>
-                <MenuItem Header="导入岩芯照片..." Click="ImportPhotos_Click"/>
+                <MenuItem Header="导入数据表..." Click="ImportData_Click"/>
+                <MenuItem Header="导入岩心照片..." Click="ImportPhotos_Click"/>
                 <MenuItem Header="导出报告..." Click="ExportReport_Click" IsEnabled="False"/>
                 <Separator/>
                 <MenuItem Header="退出" Click="Exit_Click"/>
@@ -50,18 +51,6 @@
                 <Separator/>
                 <MenuItem Header="删除项目" Click="DeleteProject_Click"/>
                 <MenuItem Header="删除钻孔" Click="DeleteBorehole_Click"/>
-            </MenuItem>
-            <MenuItem Header="分析(_A)">
-                <MenuItem Header="单张图像分析" Click="AnalyzeSinglePhoto_Click"/>
-                <MenuItem Header="人工批量绘制" Click="AnalyzeBatch_Click"/>
-                <MenuItem Header="重新分析" Click="Reanalyze_Click"/>
-            </MenuItem>
-            <MenuItem Header="视图(_V)">
-                <MenuItem Header="岩芯编辑器" Click="ViewCoreEditor_Click"/>
-                <MenuItem Header="分析结果" Click="ViewAnalysisResult_Click"/>
-                <MenuItem Header="三维可视化" Click="View3D_Click"/>
-                <Separator/>
-                <MenuItem Header="刷新" Click="Refresh_Click"/>
             </MenuItem>
             <MenuItem Header="设置(_S)">
                 <MenuItem Header="规范设置..." Click="SpecificationSettings_Click" InputGestureText="Ctrl+Alt+S"/>
@@ -80,7 +69,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Left Panel: Project Tree -->
-            <Border Grid.Column="0" BorderBrush="#DDD" BorderThickness="0,0,1,0" Background="#FAFAFA">
+            <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Background="{StaticResource SurfaceAltBrush}">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
@@ -89,8 +78,13 @@
                     </Grid.RowDefinitions>
 
                     <!-- Tree Header -->
-                    <Border Grid.Row="0" Background="#E8E8E8" Padding="8,6">
-                        <TextBlock Text="项目导航" FontWeight="Bold" FontSize="13"/>
+                    <Border Grid.Row="0" Background="{StaticResource SurfaceAltBrush}" Padding="12,8" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <TextBlock Text="项目导航" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                            <Button Content="刷新" HorizontalAlignment="Right" Padding="10,3" FontSize="12"
+                                    Style="{StaticResource SecondaryButton}" Click="Refresh_Click"
+                                    ToolTip="重新加载全部项目数据"/>
+                        </Grid>
                     </Border>
 
                     <!-- Project Tree -->
@@ -121,23 +115,80 @@
                     </TreeView>
 
                     <!-- Tree Buttons -->
-                    <StackPanel Grid.Row="2" Margin="8">
-                        <Button Content="+ 新建项目" Margin="0,4" Click="NewProject_Click"
-                                Padding="8,6" Background="#4CAF50" Foreground="White" BorderThickness="0"/>
-                        <Button Content="+ 新建钻孔" Margin="0,4" Click="NewBorehole_Click"
-                                Padding="8,6" Background="#2196F3" Foreground="White" BorderThickness="0"/>
+                    <StackPanel Grid.Row="2" Margin="12,10">
+                        <Button Content="＋ 新建项目" Margin="0,4" Click="NewProject_Click"
+                                Style="{StaticResource PrimaryButton}" Padding="8,8"/>
+                        <Button Content="＋ 新建钻孔" Margin="0,4" Click="NewBorehole_Click"
+                                Style="{StaticResource SecondaryButton}" Padding="8,8"/>
                     </StackPanel>
                 </Grid>
             </Border>
 
             <!-- Splitter -->
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Center" VerticalAlignment="Stretch"
-                          Background="#E0E0E0"/>
+                          Background="{StaticResource BorderBrush}"/>
 
-            <!-- Right Panel: Tab Control -->
-            <TabControl Grid.Column="2" x:Name="MainTabControl" Padding="0" BorderThickness="0">
+            <!-- Right Panel: Workflow Steps + Tab Control -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- 工作流步骤条：选中钻孔后显示，实时反映各环节完成状态，点击跳转 -->
+                <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,8"
+                        Visibility="{Binding SelectedBorehole, Converter={StaticResource NullToVisibilityConverter}}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}" Padding="8,4" Click="WorkflowStep_Click" Tag="editor">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="Step1Dot" Width="20" Height="20" CornerRadius="10"
+                                        Background="{StaticResource BorderLightBrush}" VerticalAlignment="Center">
+                                    <TextBlock x:Name="Step1Num" Text="1" FontSize="11" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="Step1Label" Text="导入数据" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="—" Foreground="{StaticResource BorderBrush}" VerticalAlignment="Center" Margin="2,0"/>
+                        <Button Style="{StaticResource GhostButton}" Padding="8,4" Click="WorkflowStep_Click" Tag="editor">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="Step2Dot" Width="20" Height="20" CornerRadius="10"
+                                        Background="{StaticResource BorderLightBrush}" VerticalAlignment="Center">
+                                    <TextBlock x:Name="Step2Num" Text="2" FontSize="11" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="Step2Label" Text="分段填写" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="—" Foreground="{StaticResource BorderBrush}" VerticalAlignment="Center" Margin="2,0"/>
+                        <Button Style="{StaticResource GhostButton}" Padding="8,4" Click="WorkflowStep_Click" Tag="classify">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="Step3Dot" Width="20" Height="20" CornerRadius="10"
+                                        Background="{StaticResource BorderLightBrush}" VerticalAlignment="Center">
+                                    <TextBlock x:Name="Step3Num" Text="3" FontSize="11" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="Step3Label" Text="围岩分类" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="—" Foreground="{StaticResource BorderBrush}" VerticalAlignment="Center" Margin="2,0"/>
+                        <Button Style="{StaticResource GhostButton}" Padding="8,4" Click="WorkflowStep_Click" Tag="3d">
+                            <StackPanel Orientation="Horizontal">
+                                <Border x:Name="Step4Dot" Width="20" Height="20" CornerRadius="10"
+                                        Background="{StaticResource BorderLightBrush}" VerticalAlignment="Center">
+                                    <TextBlock x:Name="Step4Num" Text="4" FontSize="11" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock x:Name="Step4Label" Text="三维可视化" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <TabControl Grid.Row="1" x:Name="MainTabControl" Padding="0" BorderThickness="0">
                 <!-- Tab: 项目概览 -->
-                <TabItem Header="📊 项目概览">
+                <TabItem Header="项目概览">
                     <Grid Background="White">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -145,11 +196,11 @@
                         </Grid.RowDefinitions>
 
                         <!-- Header -->
-                        <Border Grid.Row="0" Background="#F5F5F5" Padding="16,12" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                        <Border Grid.Row="0" Background="{StaticResource SurfaceAltBrush}" Padding="16,12" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="当前项目: " FontSize="14" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding SelectedProject.Name, FallbackValue='未选择'}"
-                                           FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Foreground="#1976D2"/>
+                                           FontSize="14" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource PrimaryBrush}"/>
                             </StackPanel>
                         </Border>
 
@@ -199,8 +250,8 @@
                                                              Width="120" Padding="6,4"/>
                                                     <TextBlock Text="°" Margin="4,0,0,0" VerticalAlignment="Center"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="1" Content="💾 保存项目" HorizontalAlignment="Right"
-                                                        Padding="16,6" Background="#4CAF50" Foreground="White" BorderThickness="0"
+                                                <Button Grid.Column="1" Content="保存项目" Style="{StaticResource SuccessButton}"
+                                                        HorizontalAlignment="Right" Padding="16,6"
                                                         Click="SaveProject_Click"/>
                                             </Grid>
                                         </Grid>
@@ -211,7 +262,7 @@
                                         <ItemsControl ItemsSource="{Binding Boreholes}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Border BorderBrush="#E0E0E0" BorderThickness="1" Margin="0,4" Padding="12" CornerRadius="4"
+                                                    <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Margin="0,4" Padding="12" CornerRadius="4"
                                                             Background="White" Cursor="Hand"
                                                             MouseLeftButtonDown="BoreholeItem_Click">
                                                         <Grid>
@@ -220,7 +271,7 @@
                                                                 <ColumnDefinition Width="*"/>
                                                                 <ColumnDefinition Width="Auto"/>
                                                             </Grid.ColumnDefinitions>
-                                                            <TextBlock Grid.Column="0" Text="{Binding Number}" FontWeight="Bold" Foreground="#1976D2"/>
+                                                            <TextBlock Grid.Column="0" Text="{Binding Number}" FontWeight="Bold" Foreground="{StaticResource PrimaryBrush}"/>
                                                             <StackPanel Grid.Column="1">
                                                                 <TextBlock>
                                                                     <Run Text="孔深:"/>
@@ -237,7 +288,7 @@
                                                             </StackPanel>
                                                             <Button Grid.Column="2" Content="选择" Padding="12,4"
                                                                     Click="SelectBorehole_Click" Tag="{Binding}"
-                                                                    BorderThickness="0" Background="#2196F3" Foreground="White"/>
+                                                                    BorderThickness="0" Background="{StaticResource PrimaryBrush}" Foreground="White"/>
                                                         </Grid>
                                                     </Border>
                                                 </DataTemplate>
@@ -250,8 +301,8 @@
                     </Grid>
                 </TabItem>
 
-                <!-- Tab: 岩芯编辑器 -->
-                <TabItem Header="🗺️ 岩芯编辑器" IsEnabled="{Binding SelectedBorehole, Converter={StaticResource NotNullToBoolConverter}}">
+                <!-- Tab: 岩心编辑器 -->
+                <TabItem Header="岩心编辑器" IsEnabled="{Binding SelectedBorehole, Converter={StaticResource NotNullToBoolConverter}}">
                     <Grid Background="White">
                         <TextBlock Text="请先在左侧选择钻孔"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
@@ -265,20 +316,21 @@
                             </Grid.RowDefinitions>
 
                             <!-- Header -->
-                            <Border Grid.Row="0" Background="#F5F5F5" Padding="16,12" BorderBrush="#E0E0E0" BorderThickness="0,0,0,1">
+                            <Border Grid.Row="0" Background="{StaticResource SurfaceAltBrush}" Padding="16,10"
+                                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="钻孔: " FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="钻孔: " Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Text="{Binding Number}" FontSize="14" FontWeight="Bold"
-                                               VerticalAlignment="Center" Foreground="#1976D2" Margin="0,0,20,0"/>
-                                    <TextBlock Text="孔深: " FontSize="14" VerticalAlignment="Center"/>
+                                               VerticalAlignment="Center" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,20,0"/>
+                                    <TextBlock Text="孔深: " Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Text="{Binding TotalDepth, StringFormat={}{0:F1}m}" FontSize="14" FontWeight="Bold"
                                                VerticalAlignment="Center" Margin="0,0,20,0"/>
-                                    <TextBlock Text="地下水埋深: " FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="地下水埋深: " Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Text="{Binding GroundwaterDepth, StringFormat={}{0:F1}m}" FontSize="14" FontWeight="Bold"
-                                               VerticalAlignment="Center" Foreground="#1976D2" Margin="0,0,20,0"/>
-                                    <TextBlock Text="物理段: " FontSize="14" VerticalAlignment="Center"/>
+                                               VerticalAlignment="Center" Foreground="{StaticResource PrimaryBrush}" Margin="0,0,20,0"/>
+                                    <TextBlock Text="物理段: " Style="{StaticResource FieldLabel}"/>
                                     <TextBlock Text="{Binding CorePhotos.Count}" FontSize="14" FontWeight="Bold"
-                                               VerticalAlignment="Center" Foreground="#E65100"/>
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
 
@@ -291,7 +343,7 @@
                                 </Grid.ColumnDefinitions>
 
                                 <!-- Left: Physical segments + Info segments -->
-                                <Border Grid.Column="0" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4">
+                                <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
@@ -303,31 +355,30 @@
                                         </Grid.RowDefinitions>
 
                                         <!-- Physical segments header -->
-                                        <Border Grid.Row="0" Background="#FFF3E0" Padding="12,8">
+                                        <Border Grid.Row="0" Background="{StaticResource SurfaceAltBrush}" Padding="12,8"
+                                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="岩芯物理段 (CorePhotos)" FontWeight="SemiBold" Foreground="#E65100" VerticalAlignment="Center"/>
-                                                <TextBlock Text="按箱号/深度展示照片解析结果" Foreground="Gray" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                                <TextBlock Text="岩心物理段" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                                                <TextBlock Text="（照片作为附件保留，不参与判定）" Style="{StaticResource HintText}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                             </StackPanel>
                                         </Border>
 
                                         <!-- Physical segments toolbar -->
-                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="8">
-                                            <Button x:Name="ImportPhotosToolbarButton" Content="📂 导入照片" Padding="12,5" Margin="0,0,6,0"
-                                                    Background="#FF9800" Foreground="White" BorderThickness="0"
-                                                    Click="ImportPhotosToolbarButton_Click"/>
-                                            <Button x:Name="AnalyzeBatchButton" Content="✏️ 人工批量绘制" Padding="12,5" Margin="6,0"
-                                                    Background="#9C27B0" Foreground="White" BorderThickness="0"
-                                                    Click="AnalyzeBatch_Click"/>
-                                            <Button x:Name="AutoAnalyzeButton" Content="🤖 自动识别分析" Padding="12,5" Margin="6,0"
-                                                    Background="#607D8B" Foreground="White" BorderThickness="0"
-                                                    IsEnabled="False"
-                                                    ToolTip="自动识别功能开发中，将基于训练数据实现精准识别"/>
-                                            <Button x:Name="RefreshPhotosButton" Content="🔄 刷新" Padding="12,5" Margin="6,0"
-                                                    Click="RefreshPhotosButton_Click"/>
-                                            <Button x:Name="EditPhotoButton" Content="✏️ 编辑" Padding="12,5" Margin="6,0"
-                                                    Click="EditPhotoButton_Click"/>
-                                            <Button x:Name="DeletePhotoButton" Content="🗑️ 删除" Padding="12,5" Margin="6,0"
-                                                    Background="#E53935" Foreground="White" BorderThickness="0"
+                                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="12,8">
+                                            <Button x:Name="ImportDataButton" Content="导入数据表" Style="{StaticResource PrimaryButton}"
+                                                    Margin="0,0,8,0" Click="ImportData_Click"
+                                                    ToolTip="按岩心回次统计模板（一钻孔一文件）导入回次数据，自动判定完整性"/>
+                                            <Button x:Name="DataSourceButton" Content="数据源管理" Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" Click="DataSourceManager_Click"
+                                                    ToolTip="查看/删除该钻孔的导入批次"/>
+                                            <Button x:Name="ImportPhotosToolbarButton" Content="导入照片(附件)" Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" Click="ImportPhotosToolbarButton_Click"
+                                                    ToolTip="岩心照片作为附件保留，不参与判定"/>
+                                            <Button x:Name="RefreshPhotosButton" Content="刷新" Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" Click="RefreshPhotosButton_Click"/>
+                                            <Button x:Name="EditPhotoButton" Content="编辑" Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" Click="EditPhotoButton_Click"/>
+                                            <Button x:Name="DeletePhotoButton" Content="删除" Style="{StaticResource DangerButton}"
                                                     Click="DeletePhotoButton_Click"/>
                                         </StackPanel>
 
@@ -346,10 +397,8 @@
                                                   Margin="8,0,8,8">
                                             <DataGrid.ContextMenu>
                                                 <ContextMenu>
-                                                    <MenuItem Header="✏️ 人工标注分析" Click="AnalyzeSinglePhoto_Click"/>
-                                                    <Separator/>
-                                                    <MenuItem Header="✏️ 编辑" Click="EditPhotoButton_Click"/>
-                                                    <MenuItem Header="🗑️ 删除" Click="DeletePhotoButton_Click"/>
+                                                    <MenuItem Header="编辑" Click="EditPhotoButton_Click"/>
+                                                    <MenuItem Header="删除" Click="DeletePhotoButton_Click"/>
                                                 </ContextMenu>
                                             </DataGrid.ContextMenu>
                                             <DataGrid.Columns>
@@ -366,1000 +415,242 @@
                                         <!-- Separator -->
                                         <Separator Grid.Row="3" Margin="8,4"/>
 
-                                        <!-- 完整性等级分组 -->
-                                        <Border Grid.Row="4" Background="#E3F2FD" Padding="12,8">
+                                        <!-- 完整性分段 header -->
+                                        <Border Grid.Row="4" Background="{StaticResource SurfaceAltBrush}" Padding="12,8"
+                                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
                                             <Grid>
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                    <TextBlock Text="完整性等级分组" FontWeight="SemiBold" Foreground="#1565C0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="（由阶段三分析结果自动聚合生成）" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                                    <TextBlock Text="完整性分段" Style="{StaticResource SectionTitle}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="（由导入数据自动生成，可直接在表中编辑）" Style="{StaticResource HintText}" VerticalAlignment="Center" Margin="8,0,0,0"/>
                                                 </StackPanel>
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
-                                                    <Button Content="💾 保存当前设置" Padding="10,4" Margin="0,0,8,0"
-                                                            Background="#388E3C" Foreground="White" BorderThickness="0"
+                                                    <ComboBox x:Name="LevelSettingsCombo" Width="88" Height="26" VerticalAlignment="Center" Margin="0,0,6,0"
+                                                              ToolTip="选择要批量设置参数的完整性等级">
+                                                        <ComboBox.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                            </DataTemplate>
+                                                        </ComboBox.ItemTemplate>
+                                                    </ComboBox>
+                                                    <Button Content="等级参数" Style="{StaticResource SecondaryButton}" Padding="10,4" Margin="0,0,8,0"
+                                                            Click="LevelSettings_Click"/>
+                                                    <Button Content="保存设置" Style="{StaticResource SuccessButton}" Padding="10,4"
                                                             Click="SaveIntegritySegments_Click"/>
-                                                    <Button Content="🔄 刷新分组" Padding="10,4"
-                                                            Background="#1976D2" Foreground="White" BorderThickness="0"
-                                                            Click="RefreshIntegritySegments_Click"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
 
-                                        <!-- 完整性等级卡片区域（5个等级，从完整到破碎） -->
-                                        <ScrollViewer Grid.Row="5" VerticalScrollBarVisibility="Auto" Margin="8,4,8,8">
-                                            <StackPanel x:Name="IntegrityLevelCardsPanel">
-                                                <!-- 完整 -->
-                                                <Border BorderBrush="#4CAF50" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8" Tag="完整">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Border Grid.Row="0" Background="#E8F5E9" Padding="10,6">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <Ellipse Width="12" Height="12" Fill="#4CAF50" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="完整" FontWeight="SemiBold" Foreground="#2E7D32" VerticalAlignment="Center"/>
-                                                                    <TextBlock x:Name="CompleteTotalLength" Text="" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1" Content="⚙ 分段设置参数" Padding="10,3" FontSize="12"
-                                                                        Background="#4CAF50" Foreground="White" BorderThickness="0"
-                                                                        Click="SegmentSettings_Click" Tag="Intact"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataGrid Grid.Row="1" x:Name="CompleteSegmentsGrid"
-                                                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                                                  CanUserSortColumns="False" CanUserResizeColumns="True"
-                                                                  IsReadOnly="False" HeadersVisibility="Column"
-                                                                  SelectionMode="Extended" Margin="4,4,4,4"
-                                                                  MaxHeight="200"
-                                                                  VirtualizingPanel.IsVirtualizing="False">
-                                                            <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
-                                                                <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                            </DataGrid.Columns>
-                                                        </DataGrid>
-                                                    </Grid>
-                                                </Border>
+                                        <!-- 统一完整性分段表：等级筛选 chips + 单表 -->
+                                        <Grid Grid.Row="5" Margin="12,8,12,12">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
 
-                                                <!-- 较完整 -->
-                                                <Border BorderBrush="#2196F3" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8" Tag="较完整">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Border Grid.Row="0" Background="#E3F2FD" Padding="10,6">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <Ellipse Width="12" Height="12" Fill="#2196F3" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="较完整" FontWeight="SemiBold" Foreground="#1565C0" VerticalAlignment="Center"/>
-                                                                    <TextBlock x:Name="RelativelyCompleteTotalLength" Text="" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1" Content="⚙ 分段设置参数" Padding="10,3" FontSize="12"
-                                                                        Background="#2196F3" Foreground="White" BorderThickness="0"
-                                                                        Click="SegmentSettings_Click" Tag="RelativelyIntact"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataGrid Grid.Row="1" x:Name="RelativelyCompleteSegmentsGrid"
-                                                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                                                  CanUserSortColumns="False" CanUserResizeColumns="True"
-                                                                  IsReadOnly="False" HeadersVisibility="Column"
-                                                                  SelectionMode="Extended" Margin="4,4,4,4"
-                                                                  MaxHeight="200"
-                                                                  VirtualizingPanel.IsVirtualizing="False">
-                                                            <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
-                                                                <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                            </DataGrid.Columns>
-                                                        </DataGrid>
-                                                    </Grid>
-                                                </Border>
-
-                                                <!-- 完整性差 -->
-                                                <Border BorderBrush="#FF9800" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8" Tag="完整性差">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Border Grid.Row="0" Background="#FFF3E0" Padding="10,6">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <Ellipse Width="12" Height="12" Fill="#FF9800" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="完整性差" FontWeight="SemiBold" Foreground="#E65100" VerticalAlignment="Center"/>
-                                                                    <TextBlock x:Name="PoorIntegrityTotalLength" Text="" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1" Content="⚙ 分段设置参数" Padding="10,3" FontSize="12"
-                                                                        Background="#FF9800" Foreground="White" BorderThickness="0"
-                                                                        Click="SegmentSettings_Click" Tag="Poor"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataGrid Grid.Row="1" x:Name="PoorIntegritySegmentsGrid"
-                                                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                                                  CanUserSortColumns="False" CanUserResizeColumns="True"
-                                                                  IsReadOnly="False" HeadersVisibility="Column"
-                                                                  SelectionMode="Extended" Margin="4,4,4,4"
-                                                                  MaxHeight="200"
-                                                                  VirtualizingPanel.IsVirtualizing="False">
-                                                            <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
-                                                                <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                            </DataGrid.Columns>
-                                                        </DataGrid>
-                                                    </Grid>
-                                                </Border>
-
-                                                <!-- 较破碎 -->
-                                                <Border BorderBrush="#FF5722" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8" Tag="较破碎">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Border Grid.Row="0" Background="#FBE9E7" Padding="10,6">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <Ellipse Width="12" Height="12" Fill="#FF5722" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="较破碎" FontWeight="SemiBold" Foreground="#BF360C" VerticalAlignment="Center"/>
-                                                                    <TextBlock x:Name="RelativelyFragmentedTotalLength" Text="" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1" Content="⚙ 分段设置参数" Padding="10,3" FontSize="12"
-                                                                        Background="#FF5722" Foreground="White" BorderThickness="0"
-                                                                        Click="SegmentSettings_Click" Tag="RelativelyBroken"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataGrid Grid.Row="1" x:Name="RelativelyFragmentedSegmentsGrid"
-                                                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                                                  CanUserSortColumns="False" CanUserResizeColumns="True"
-                                                                  IsReadOnly="False" HeadersVisibility="Column"
-                                                                  SelectionMode="Extended" Margin="4,4,4,4"
-                                                                  MaxHeight="200"
-                                                                  VirtualizingPanel.IsVirtualizing="False">
-                                                            <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
-                                                                <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                            </DataGrid.Columns>
-                                                        </DataGrid>
-                                                    </Grid>
-                                                </Border>
-
-                                                <!-- 破碎 -->
-                                                <Border BorderBrush="#F44336" BorderThickness="1" CornerRadius="4" Margin="0,0,0,4" Tag="破碎">
-                                                    <Grid>
-                                                        <Grid.RowDefinitions>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                            <RowDefinition Height="Auto"/>
-                                                        </Grid.RowDefinitions>
-                                                        <Border Grid.Row="0" Background="#FFEBEE" Padding="10,6">
-                                                            <Grid>
-                                                                <Grid.ColumnDefinitions>
-                                                                    <ColumnDefinition Width="*"/>
-                                                                    <ColumnDefinition Width="Auto"/>
-                                                                </Grid.ColumnDefinitions>
-                                                                <StackPanel Grid.Column="0" Orientation="Horizontal">
-                                                                    <Ellipse Width="12" Height="12" Fill="#F44336" Margin="0,0,8,0"/>
-                                                                    <TextBlock Text="破碎" FontWeight="SemiBold" Foreground="#C62828" VerticalAlignment="Center"/>
-                                                                    <TextBlock x:Name="FragmentedTotalLength" Text="" Foreground="Gray" VerticalAlignment="Center" Margin="8,0,0,0"/>
-                                                                </StackPanel>
-                                                                <Button Grid.Column="1" Content="⚙ 分段设置参数" Padding="10,3" FontSize="12"
-                                                                        Background="#F44336" Foreground="White" BorderThickness="0"
-                                                                        Click="SegmentSettings_Click" Tag="Broken"/>
-                                                            </Grid>
-                                                        </Border>
-                                                        <DataGrid Grid.Row="1" x:Name="FragmentedSegmentsGrid"
-                                                                  AutoGenerateColumns="False" CanUserAddRows="False"
-                                                                  CanUserSortColumns="False" CanUserResizeColumns="True"
-                                                                  IsReadOnly="False" HeadersVisibility="Column"
-                                                                  SelectionMode="Extended" Margin="4,4,4,4"
-                                                                  MaxHeight="200"
-                                                                  VirtualizingPanel.IsVirtualizing="False">
-                                                            <DataGrid.Columns>
-                                                                <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
-                                                                <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
-                                                                <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="ItemTemplate">
-                                                                                <Setter.Value>
-                                                                                    <DataTemplate>
-                                                                                        <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
-                                                                                    </DataTemplate>
-                                                                                </Setter.Value>
-                                                                            </Setter>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                                <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="80">
-                                                                    <DataGridComboBoxColumn.ElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.ElementStyle>
-                                                                    <DataGridComboBoxColumn.EditingElementStyle>
-                                                                        <Style TargetType="ComboBox">
-                                                                            <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
-                                                                            <Setter Property="DisplayMemberPath" Value="Text"/>
-                                                                            <Setter Property="SelectedValuePath" Value="Value"/>
-                                                                            <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
-                                                                        </Style>
-                                                                    </DataGridComboBoxColumn.EditingElementStyle>
-                                                                </DataGridComboBoxColumn>
-                                                            </DataGrid.Columns>
-                                                        </DataGrid>
-                                                    </Grid>
-                                                </Border>
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
+                                                <RadioButton x:Name="ChipAll" Content="全部" GroupName="SegFilter" IsChecked="True"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="All"/>
+                                                <RadioButton x:Name="ChipIntact" GroupName="SegFilter"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="Intact"/>
+                                                <RadioButton x:Name="ChipRelativelyIntact" GroupName="SegFilter"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="RelativelyIntact"/>
+                                                <RadioButton x:Name="ChipPoor" GroupName="SegFilter"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="Poor"/>
+                                                <RadioButton x:Name="ChipRelativelyBroken" GroupName="SegFilter"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="RelativelyBroken"/>
+                                                <RadioButton x:Name="ChipBroken" GroupName="SegFilter"
+                                                             Style="{StaticResource FilterChip}" Click="FilterChip_Click" Tag="Broken"/>
                                             </StackPanel>
-                                        </ScrollViewer>
+
+                                            <DataGrid Grid.Row="1" x:Name="SegmentsDataGrid"
+                                                      AutoGenerateColumns="False" CanUserAddRows="False"
+                                                      CanUserSortColumns="True" CanUserResizeColumns="True"
+                                                      IsReadOnly="False" HeadersVisibility="Column"
+                                                      SelectionMode="Extended"
+                                                      VirtualizingPanel.IsVirtualizing="False">
+                                                <DataGrid.Columns>
+                                                    <DataGridTemplateColumn Header="完整性等级" Width="92" IsReadOnly="True" SortMemberPath="IntegrityLevel">
+                                                        <DataGridTemplateColumn.CellTemplate>
+                                                            <DataTemplate>
+                                                                <Border Background="{Binding IntegrityLevel, Converter={StaticResource IntegrityLevelBrushConverter}}"
+                                                                        CornerRadius="9" Padding="8,2" Margin="4,3"
+                                                                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                                    <TextBlock Text="{Binding IntegrityLevel, Converter={StaticResource EnumDescriptionConverter}}"
+                                                                               Foreground="White" FontSize="11"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </DataGridTemplateColumn.CellTemplate>
+                                                    </DataGridTemplateColumn>
+                                                    <DataGridTextColumn Header="起点(m)" Binding="{Binding DepthStart, StringFormat=F2}" Width="70" IsReadOnly="True"/>
+                                                    <DataGridTextColumn Header="终点(m)" Binding="{Binding DepthEnd, StringFormat=F2}" Width="70" IsReadOnly="True"/>
+                                                    <DataGridTextColumn Header="长度(m)" Binding="{Binding Length, StringFormat=F2}" Width="65" IsReadOnly="True"/>
+                                                    <DataGridComboBoxColumn Header="岩质" SelectedItemBinding="{Binding RockType, UpdateSourceTrigger=PropertyChanged}" Width="75">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding Source={x:Static local:RockTypeHelper.Values}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{x:Static local:RockTypeHelper.Values}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockType_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                    <DataGridComboBoxColumn Header="岩体结构" SelectedItemBinding="{Binding RockStructureType, UpdateSourceTrigger=PropertyChanged}" Width="140">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding AvailableRockStructureTypes}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentRockStructure_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                    <DataGridComboBoxColumn Header="坚硬程度" SelectedItemBinding="{Binding RockHardnessLevel, UpdateSourceTrigger=PropertyChanged}" Width="80">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.HardnessLevelOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                    <DataGridComboBoxColumn Header="岩质均一性" SelectedItemBinding="{Binding RockHomogeneity, UpdateSourceTrigger=PropertyChanged}" Width="90">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.HomogeneityOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentProperty_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                    <DataGridComboBoxColumn Header="地下水" SelectedItemBinding="{Binding GroundwaterCondition, UpdateSourceTrigger=PropertyChanged}" Width="75">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.GroundwaterOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="ItemTemplate">
+                                                                    <Setter.Value>
+                                                                        <DataTemplate>
+                                                                            <TextBlock Text="{Binding Converter={StaticResource EnumDescriptionConverter}}"/>
+                                                                        </DataTemplate>
+                                                                    </Setter.Value>
+                                                                </Setter>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentGroundwater_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                    <DataGridComboBoxColumn Header="洞轴夹角" SelectedValueBinding="{Binding CaveAxisAngleLessThan30, UpdateSourceTrigger=PropertyChanged}" Width="*">
+                                                        <DataGridComboBoxColumn.ElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="DisplayMemberPath" Value="Text"/>
+                                                                <Setter Property="SelectedValuePath" Value="Value"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.ElementStyle>
+                                                        <DataGridComboBoxColumn.EditingElementStyle>
+                                                            <Style TargetType="ComboBox">
+                                                                <Setter Property="ItemsSource" Value="{Binding DataContext.CaveAxisOptions, RelativeSource={RelativeSource AncestorType=Window}}"/>
+                                                                <Setter Property="DisplayMemberPath" Value="Text"/>
+                                                                <Setter Property="SelectedValuePath" Value="Value"/>
+                                                                <EventSetter Event="SelectionChanged" Handler="IntegritySegmentCaveAxis_SelectionChanged"/>
+                                                            </Style>
+                                                        </DataGridComboBoxColumn.EditingElementStyle>
+                                                    </DataGridComboBoxColumn>
+                                                </DataGrid.Columns>
+                                            </DataGrid>
+                                        </Grid>
                                     </Grid>
                                 </Border>
 
                                 <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                                              Background="#F0F0F0" ResizeBehavior="PreviousAndNext"/>
+                                              Background="{StaticResource BorderLightBrush}" ResizeBehavior="PreviousAndNext"/>
 
                                 <!-- Right: Borehole properties only -->
-                                <Border Grid.Column="2" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4">
+                                <Border Grid.Column="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4">
                                     <!-- Borehole properties panel -->
                                     <ScrollViewer Padding="12" VerticalScrollBarVisibility="Auto">
                                         <StackPanel>
@@ -1395,8 +686,8 @@
                                                 <TextBox Grid.Column="2" Text="{Binding OrificeZ, UpdateSourceTrigger=PropertyChanged, StringFormat={}{0:F2}}" Margin="4,0,0,0" Padding="4"/>
                                             </Grid>
 
-                                            <Button Content="保存钻孔信息" Click="SaveBorehole_Click" Padding="12,8" Margin="0,8"
-                                                    Background="#4CAF50" Foreground="White" BorderThickness="0"/>
+                                            <Button Content="保存钻孔信息" Click="SaveBorehole_Click" Style="{StaticResource SuccessButton}"
+                                                    Padding="12,8" Margin="0,8"/>
                                         </StackPanel>
                                     </ScrollViewer>
                                 </Border>
@@ -1406,7 +697,7 @@
                 </TabItem>
 
                 <!-- Tab: 图像分析结果 -->
-                <TabItem Header="🔍 图像分析结果">
+                <TabItem Header="分析结果" Visibility="Collapsed">
                     <Grid Background="White">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="280"/>
@@ -1414,7 +705,7 @@
                         </Grid.ColumnDefinitions>
 
                         <!-- 左侧：已分析照片列表 -->
-                        <Border Grid.Column="0" BorderBrush="#E0E0E0" BorderThickness="0,0,1,0" Background="#FAFAFA">
+                        <Border Grid.Column="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Background="{StaticResource SurfaceAltBrush}">
                             <Grid>
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto"/>
@@ -1426,10 +717,9 @@
                                         <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="已分析照片" FontWeight="Bold"
-                                               VerticalAlignment="Center" Foreground="#333"/>
-                                    <Button Grid.Column="1" Content="🔄 刷新" Click="RefreshAnalysisResult_Click"
-                                            FontSize="11" Padding="8,3" Cursor="Hand"
-                                            Background="#F5F5F5" BorderBrush="#CCC" BorderThickness="1"
+                                               VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                    <Button Grid.Column="1" Content="刷新" Style="{StaticResource SecondaryButton}"
+                                            FontSize="11" Padding="8,3" Click="RefreshAnalysisResult_Click"
                                             ToolTip="刷新已分析照片列表"/>
                                 </Grid>
                                 <ListView Grid.Row="1" x:Name="AnalyzedPhotosListView"
@@ -1453,10 +743,10 @@
                                                         </Border>
                                                         <ControlTemplate.Triggers>
                                                             <Trigger Property="IsSelected" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#E3F2FD"/>
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
                                                             </Trigger>
                                                             <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="Bd" Property="Background" Value="#F0F0F0"/>
+                                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BorderLightBrush}"/>
                                                             </Trigger>
                                                         </ControlTemplate.Triggers>
                                                     </ControlTemplate>
@@ -1467,11 +757,11 @@
                                     <ListView.ItemTemplate>
                                         <DataTemplate>
                                             <StackPanel>
-                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" Foreground="#222"
+                                                <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis"/>
                                                 <TextBlock Text="{Binding DepthStart, StringFormat='深度: {0:F2} m'}"
-                                                           FontSize="11" Foreground="#777" Margin="0,2,0,0"/>
-                                                <TextBlock Text="{Binding AnalysisStatus}" FontSize="11" Foreground="#388E3C"
+                                                           FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding AnalysisStatus}" FontSize="11" Foreground="{StaticResource SuccessBrush}"
                                                            Margin="0,2,0,0"/>
                                             </StackPanel>
                                         </DataTemplate>
@@ -1493,22 +783,22 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <!-- 标注图像预览（支持缩放和拖动） -->
-                                <Border Grid.Row="0" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8"
+                                <Border Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8"
                                         Height="400" HorizontalAlignment="Stretch">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
-                                        <Border Grid.Row="0" Background="#F0F0F0" Padding="8,6">
+                                        <Border Grid.Row="0" Background="{StaticResource BorderLightBrush}" Padding="8,6">
                                             <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="📷 分析可视化预览" FontWeight="Bold" VerticalAlignment="Center" Foreground="#333"/>
-                                                <TextBlock Text=" — 滚轮缩放 · 按住拖动" FontSize="11" Foreground="#666" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                                <TextBlock Text="📷 分析可视化预览" FontWeight="Bold" VerticalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+                                                <TextBlock Text=" — 滚轮缩放 · 按住拖动" FontSize="11" Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="10,0,0,0"/>
                                                 <Button x:Name="ZoomControls" Content="🔍 100%" Margin="20,0,0,0" FontSize="11" Padding="8,2"
-                                                        Background="Transparent" BorderBrush="#CCC" Click="ResetZoom_Click" Cursor="Hand"/>
+                                                        Background="Transparent" BorderBrush="{StaticResource BorderBrush}" Click="ResetZoom_Click" Cursor="Hand"/>
                                             </StackPanel>
                                         </Border>
-                                        <Border Grid.Row="1" x:Name="ImageContainer" Background="#FAFAFA"
+                                        <Border Grid.Row="1" x:Name="ImageContainer" Background="{StaticResource SurfaceAltBrush}"
                                                 MouseWheel="ImageContainer_MouseWheel"
                                                 MouseLeftButtonDown="ImageContainer_MouseLeftButtonDown"
                                                 MouseLeftButtonUp="ImageContainer_MouseLeftButtonUp"
@@ -1518,7 +808,7 @@
                                             <Grid>
                                                 <TextBlock Text="选择已分析照片以查看标注结果"
                                                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                                                           Foreground="#999" FontSize="14"
+                                                           Foreground="{StaticResource TextDisabledBrush}" FontSize="14"
                                                            Visibility="{Binding AnnotatedImage, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter='inverse'}"/>
                                                 <Image x:Name="AnnotatedImageControl"
                                                        Source="{Binding AnnotatedImage}"
@@ -1540,20 +830,20 @@
                                 </Border>
 
                                 <!-- 完整性分段（主要结果） -->
-                                <Border Grid.Row="1" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                                <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,0,0,8" HorizontalAlignment="Stretch">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="完整性分段（按岩芯段对应钻孔深度）" FontWeight="Bold"
-                                                  Margin="0,8,0,6" Foreground="#333"/>
+                                        <TextBlock Grid.Row="0" Text="完整性分段（按岩心段对应钻孔深度）" FontWeight="Bold"
+                                                  Margin="0,8,0,6" Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <DataGrid x:Name="IntegritySegmentsGrid" Grid.Row="1"
                                                  ItemsSource="{Binding IntegritySegments}"
                                                  AutoGenerateColumns="False" CanUserAddRows="False"
                                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
                                                  HeadersVisibility="Column" RowHeight="26" Background="White"
-                                                 BorderBrush="#E0E0E0"
+                                                 BorderBrush="{StaticResource BorderBrush}"
                                                  HorizontalAlignment="Stretch"
                                                  MaxHeight="400"
                                                  ScrollViewer.CanContentScroll="True"
@@ -1569,7 +859,7 @@
                                             <DataGrid.CellStyle>
                                                 <Style TargetType="DataGridCell">
                                                     <Setter Property="BorderBrush" Value="Transparent"/>
-                                                    <Setter Property="Foreground" Value="#444"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
                                                 </Style>
                                             </DataGrid.CellStyle>
                                             <DataGrid.RowStyle>
@@ -1577,7 +867,7 @@
                                                     <Setter Property="Background" Value="White"/>
                                                     <Style.Triggers>
                                                         <Trigger Property="AlternationIndex" Value="1">
-                                                            <Setter Property="Background" Value="#FAFAFA"/>
+                                                            <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}"/>
                                                         </Trigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -1587,19 +877,19 @@
                                 </Border>
 
                                 <!-- 结构面发育程度（同表 F.0.4 判定） -->
-                                <Border Grid.Row="2" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Margin="0,0,0,8" HorizontalAlignment="Stretch">
+                                <Border Grid.Row="2" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Margin="0,0,0,8" HorizontalAlignment="Stretch">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="结构面发育程度（按岩芯段分布）" FontWeight="Bold"
-                                                  Margin="0,8,0,6" Foreground="#333"/>
+                                        <TextBlock Grid.Row="0" Text="结构面发育程度（按岩心段分布）" FontWeight="Bold"
+                                                  Margin="0,8,0,6" Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <DataGrid Grid.Row="1" ItemsSource="{Binding DevelopmentSegments}"
                                                  AutoGenerateColumns="False" CanUserAddRows="False"
                                                  IsReadOnly="True" GridLinesVisibility="Horizontal"
                                                  HeadersVisibility="Column" RowHeight="26" Background="White"
-                                                 BorderBrush="#E0E0E0"
+                                                 BorderBrush="{StaticResource BorderBrush}"
                                                  HorizontalAlignment="Stretch"
                                                  MaxHeight="380"
                                                  ScrollViewer.CanContentScroll="True"
@@ -1615,7 +905,7 @@
                                             <DataGrid.CellStyle>
                                                 <Style TargetType="DataGridCell">
                                                     <Setter Property="BorderBrush" Value="Transparent"/>
-                                                    <Setter Property="Foreground" Value="#444"/>
+                                                    <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
                                                 </Style>
                                             </DataGrid.CellStyle>
                                             <DataGrid.RowStyle>
@@ -1623,7 +913,7 @@
                                                     <Setter Property="Background" Value="White"/>
                                                     <Style.Triggers>
                                                         <Trigger Property="AlternationIndex" Value="1">
-                                                            <Setter Property="Background" Value="#FAFAFA"/>
+                                                            <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}"/>
                                                         </Trigger>
                                                     </Style.Triggers>
                                                 </Style>
@@ -1633,10 +923,10 @@
                                 </Border>
 
                                 <!-- 分析摘要 -->
-                                <Border Grid.Row="3" Background="#F5F9FF" BorderBrush="#BBDEFB" BorderThickness="1"
+                                <Border Grid.Row="3" Background="{StaticResource PrimaryLightBrush}" BorderBrush="{StaticResource PrimaryLightBrush}" BorderThickness="1"
                                         CornerRadius="4" Padding="12" Margin="0,0,0,8" HorizontalAlignment="Stretch">
                                     <TextBlock Text="{Binding AnalysisDetail}" TextWrapping="Wrap"
-                                              Foreground="#333" FontSize="13"/>
+                                              Foreground="{StaticResource TextPrimaryBrush}" FontSize="13"/>
                                 </Border>
 
                             </Grid>
@@ -1645,7 +935,7 @@
                 </TabItem>
 
                 <!-- Tab: 围岩分类（阶段五） -->
-                <TabItem Header="📊 围岩分类">
+                <TabItem Header="围岩分类">
                     <Grid Background="White">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -1653,13 +943,11 @@
                         </Grid.RowDefinitions>
 
                         <!-- 工具栏 -->
-                        <Border Grid.Row="0" Background="#F5F9FF" BorderBrush="#BBDEFB" BorderThickness="0,0,0,1" Padding="12">
+                        <Border Grid.Row="0" Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12">
                             <StackPanel Orientation="Horizontal">
-                                <Button Content="🚀 生成/刷新当前钻孔围岩分类" Padding="12,6" Margin="0,0,12,0"
-                                        Background="#1976D2" Foreground="White" BorderThickness="0"
+                                <Button Content="生成/刷新围岩分类" Style="{StaticResource PrimaryButton}" Margin="0,0,8,0"
                                         Click="ClassifyBorehole_Click"/>
-                                <Button Content="📊 刷新项目统计" Padding="12,6"
-                                        Background="#388E3C" Foreground="White" BorderThickness="0"
+                                <Button Content="刷新项目统计" Style="{StaticResource SecondaryButton}"
                                         Click="RefreshProjectStatistics_Click"/>
                             </StackPanel>
                         </Border>
@@ -1675,14 +963,14 @@
                                 </Grid.RowDefinitions>
 
                                 <!-- 单钻孔分析段 -->
-                                <Border Grid.Row="0" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
+                                <Border Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="当前钻孔分析段（三段融合结果）" FontWeight="Bold" Margin="0,0,0,8" Foreground="#333"/>
+                                        <TextBlock Grid.Row="0" Text="当前钻孔分析段（三段融合结果）" FontWeight="Bold" Margin="0,0,0,8" Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <DataGrid Grid.Row="1" ItemsSource="{Binding ClassificationSegments}"
                                                   AutoGenerateColumns="False" CanUserAddRows="False"
                                                   IsReadOnly="True" GridLinesVisibility="Horizontal"
@@ -1703,14 +991,14 @@
                                                 <DataGridTextColumn Header="判定依据" Binding="{Binding Basis}" Width="3*"/>
                                             </DataGrid.Columns>
                                         </DataGrid>
-                                        <TextBlock Grid.Row="2" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="#1565C0"
+                                        <TextBlock Grid.Row="2" FontSize="14" FontWeight="SemiBold" Margin="0,10,0,0" Foreground="{StaticResource PrimaryBrush}"
                                                    Visibility="{Binding CurrentBoreholeClassSummary, Converter={StaticResource NullToVisibilityConverter}}"
                                                    Text="{Binding CurrentBoreholeClassSummary}"/>
                                     </Grid>
                                 </Border>
 
                                 <!-- 项目统计概览 -->
-                                <Border Grid.Row="1" BorderBrush="#E0E0E0" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12"
+                                <Border Grid.Row="1" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12"
                                         Visibility="{Binding ProjectStatistics.ClassStats, Converter={StaticResource NullToVisibilityConverter}}">
                                     <Grid>
                                         <Grid.RowDefinitions>
@@ -1721,16 +1009,16 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="项目围岩统计" FontWeight="Bold" Margin="0,0,0,8" Foreground="#333"/>
+                                        <TextBlock Grid.Row="0" Text="项目围岩统计" FontWeight="Bold" Margin="0,0,0,8" Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <StackPanel Grid.Row="1" Margin="0,0,0,8">
-                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#1565C0">
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}">
                                                 <TextBlock.Text>
                                                     <MultiBinding StringFormat="围岩初步分类（按钻孔总深度）：{0}">
                                                         <Binding Path="ProjectStatistics.OverallClassSummary"/>
                                                     </MultiBinding>
                                                 </TextBlock.Text>
                                             </TextBlock>
-                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="#1565C0" Margin="0,2,0,0">
+                                            <TextBlock FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource PrimaryBrush}" Margin="0,2,0,0">
                                                 <TextBlock.Text>
                                                     <MultiBinding StringFormat="围岩初步分类（按已分析长度）：{0}">
                                                         <Binding Path="ProjectStatistics.OverallClassSummaryByAnalyzed"/>
@@ -1740,7 +1028,7 @@
                                         </StackPanel>
                                         <TextBlock Grid.Row="2" Margin="0,0,0,8">
                                             <TextBlock.Text>
-                                                <MultiBinding StringFormat="岩芯总长度：{0:F2}m，已分类：{1:F2}m，未分类：{2:F2}m">
+                                                <MultiBinding StringFormat="岩心总长度：{0:F2}m，已分类：{1:F2}m，未分类：{2:F2}m">
                                                     <Binding Path="ProjectStatistics.TotalCoreLength"/>
                                                     <Binding Path="ProjectStatistics.TotalClassifiedLength"/>
                                                     <Binding Path="ProjectStatistics.TotalUnclassifiedLength"/>
@@ -1763,7 +1051,7 @@
                                             </DataGrid.Columns>
                                         </DataGrid>
 
-                                        <TextBlock Grid.Row="4" Text="各钻孔围岩分类" FontWeight="SemiBold" Margin="0,0,0,6" Foreground="#333"/>
+                                        <TextBlock Grid.Row="4" Text="各钻孔围岩分类" FontWeight="SemiBold" Margin="0,0,0,6" Foreground="{StaticResource TextPrimaryBrush}"/>
                                         <ItemsControl Grid.Row="5" ItemsSource="{Binding ProjectStatistics.BoreholeStats}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
@@ -1776,7 +1064,7 @@
                                                                 </MultiBinding>
                                                             </TextBlock.Text>
                                                         </TextBlock>
-                                                        <TextBlock FontSize="12" Foreground="#666">
+                                                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryBrush}">
                                                             <TextBlock.Text>
                                                                 <MultiBinding StringFormat="{}{0}围岩分类（按分析长）：{1}">
                                                                     <Binding Path="BoreholeNumber"/>
@@ -1792,19 +1080,19 @@
                                 </Border>
 
                                 <!-- 薄弱段 -->
-                                <Border Grid.Row="2" BorderBrush="#FFCDD2" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12"
-                                        Background="#FFEBEE"
+                                <Border Grid.Row="2" BorderBrush="{StaticResource DangerBgBrush}" BorderThickness="1" CornerRadius="4" Padding="12" Margin="0,0,0,12"
+                                        Background="{StaticResource DangerBgBrush}"
                                         Visibility="{Binding ProjectStatistics.WeakSections, Converter={StaticResource NullToVisibilityConverter}}">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Text="⚠ IV/V 类薄弱段" FontWeight="Bold" Foreground="#C62828" Margin="0,0,0,6"/>
+                                        <TextBlock Grid.Row="0" Text="⚠ IV/V 类薄弱段" FontWeight="Bold" Foreground="{StaticResource DangerBrush}" Margin="0,0,0,6"/>
                                         <ItemsControl Grid.Row="1" ItemsSource="{Binding ProjectStatistics.WeakSections}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Foreground="#C62828" Margin="0,2">
+                                                    <TextBlock Foreground="{StaticResource DangerBrush}" Margin="0,2">
                                                         <TextBlock.Text>
                                                             <MultiBinding StringFormat="{}{0} 深 {1:F2}-{2:F2}m 为 {3} 类，长 {4:F2}m">
                                                                 <Binding Path="BoreholeNumber"/>
@@ -1826,12 +1114,12 @@
                 </TabItem>
 
                 <!-- Tab: 三维可视化 -->
-                <TabItem Header="🌐 三维可视化">
+                <TabItem Header="三维可视化">
                     <view:ThreeDimView x:Name="ThreeDimViewControl"/>
                 </TabItem>
 
                 <!-- Tab: 报告 -->
-                <TabItem Header="📄 报告">
+                <TabItem Header="报告">
                     <Grid Background="White">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="报告生成" FontSize="18" FontWeight="Bold" Margin="0,0,0,20"/>
@@ -1841,23 +1129,28 @@
                         </StackPanel>
                     </Grid>
                 </TabItem>
-            </TabControl>
+                </TabControl>
+            </Grid>
         </Grid>
 
         <!-- Status Bar -->
-        <Border Grid.Row="2" Background="#F5F5F5" BorderBrush="#E0E0E0" BorderThickness="0,1,0,0" Padding="10,6">
+        <Border Grid.Row="2" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,6">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="260"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="#666" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Grid.Column="0" Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="12"/>
                 <ProgressBar Grid.Column="1" x:Name="AnalysisProgressBar"
                              Minimum="0" Maximum="100" Value="{Binding AnalysisProgress}"
-                             Height="16" Margin="12,0" Visibility="{Binding AnalysisProgressVisible, Converter={StaticResource BoolToVisibilityConverter}}"
-                             Foreground="#1976D2"/>
-                <TextBlock Grid.Column="2" Text="RockCore v1.0" Foreground="#999" VerticalAlignment="Center"/>
+                             Height="6" Margin="12,0" VerticalAlignment="Center"
+                             Visibility="{Binding AnalysisProgressVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                             Foreground="{StaticResource PrimaryBrush}" BorderThickness="0"
+                             Background="{StaticResource BorderLightBrush}"/>
+                <TextBlock Grid.Column="2" x:Name="VersionTextBlock" Text="RockCore" Foreground="{StaticResource TextDisabledBrush}"
+                           VerticalAlignment="Center" FontSize="12"/>
             </Grid>
         </Border>
     </Grid>

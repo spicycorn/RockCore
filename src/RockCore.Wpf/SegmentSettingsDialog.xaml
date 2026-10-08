@@ -91,10 +91,9 @@
         </StackPanel>
 
         <StackPanel Grid.Row="11" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="确定" Width="80" Padding="8,6" Margin="0,0,8,0"
-                    Background="#4CAF50" Foreground="White" BorderThickness="0"
+            <Button Content="确定" Style="{StaticResource PrimaryButton}" Width="80" Padding="8,6" Margin="0,0,8,0"
                     Click="OK_Click" IsDefault="True"/>
-            <Button Content="取消" Width="80" Padding="8,6"
+            <Button Content="取消" Style="{StaticResource SecondaryButton}" Width="80" Padding="8,6"
                     Click="Cancel_Click" IsCancel="True"/>
         </StackPanel>
     </Grid>

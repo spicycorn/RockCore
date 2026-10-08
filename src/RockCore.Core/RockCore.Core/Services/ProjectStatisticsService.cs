@@ -5,7 +5,7 @@ namespace RockCore.Core.Services;
 
 /// <summary>
 /// 项目级围岩统计服务。
-/// 占比按各钻孔岩芯总长度（TotalDepth）计算，不是仅按已分类长度计算。
+/// 占比按各钻孔岩心总长度（TotalDepth）计算，不是仅按已分类长度计算。
 /// </summary>
 public class ProjectStatisticsService
 {
@@ -21,7 +21,7 @@ public class ProjectStatisticsService
         var segmentList = segments.ToList();
         var boreholeDict = boreholeList.ToDictionary(b => b.Id, b => b);
 
-        // 项目岩芯总长度：各钻孔 TotalDepth 之和
+        // 项目岩心总长度：各钻孔 TotalDepth 之和
         double totalCoreLength = boreholeList.Sum(b => b.TotalDepth);
         if (totalCoreLength <= 0)
             totalCoreLength = segmentList.Sum(s => s.DepthEnd - s.DepthStart);
@@ -69,7 +69,7 @@ public class ProjectStatisticsService
             });
         }
 
-        // 项目整体统计：每类围岩，按项目岩芯总长度计算占比
+        // 项目整体统计：每类围岩，按项目岩心总长度计算占比
         var allClassGroups = segmentList.GroupBy(s => s.RockClass);
         double analyzedBase = result.TotalClassifiedLength;
         foreach (RockClass rockClass in Enum.GetValues<RockClass>())

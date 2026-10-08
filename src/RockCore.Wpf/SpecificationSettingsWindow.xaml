@@ -11,8 +11,8 @@
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Padding" Value="8,4"/>
-            <Setter Property="Background" Value="#E3F2FD"/>
-            <Setter Property="BorderBrush" Value="#90CAF9"/>
+            <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
         </Style>
         <Style x:Key="CenterCellStyle" TargetType="DataGridCell">
@@ -34,7 +34,7 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="围岩规范参数设置" FontSize="20" FontWeight="Bold"
-                   Foreground="#1E3A5F" Margin="0,0,0,12"/>
+                   Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,12"/>
 
         <GroupBox Grid.Row="1" Header="数值阈值" Margin="0,0,0,12" Padding="12">
             <StackPanel Orientation="Horizontal">
@@ -55,14 +55,14 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="表 F.0.2（硬质岩）—— 岩质类型为硬质岩时，各完整性等级对应的岩体结构类型"
-                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                               FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                     <DataGrid Grid.Row="1" x:Name="HardRockMappingGrid"
                               AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserSortColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column"
                               CellStyle="{StaticResource CenterCellStyle}"
                               ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
-                              BorderBrush="#90CAF9" BorderThickness="1">
+                              BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="岩体结构类型" Binding="{Binding StructureName}" Width="220"/>
                             <DataGridCheckBoxColumn Header="完整" Binding="{Binding Intact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
@@ -82,14 +82,14 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="表 F.0.2（软质岩）—— 岩质类型为软质岩时，各完整性等级对应的岩体结构类型"
-                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                               FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                     <DataGrid Grid.Row="1" x:Name="SoftRockMappingGrid"
                               AutoGenerateColumns="False" CanUserAddRows="False"
                               CanUserSortColumns="False" IsReadOnly="True"
                               HeadersVisibility="Column"
                               CellStyle="{StaticResource CenterCellStyle}"
                               ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
-                              BorderBrush="#90CAF9" BorderThickness="1">
+                              BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="岩体结构类型" Binding="{Binding StructureName}" Width="220"/>
                             <DataGridCheckBoxColumn Header="完整" Binding="{Binding Intact, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
@@ -110,14 +110,14 @@
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
                     <TextBlock Grid.Row="0" Text="表 F.0.4 岩体完整程度划分——用于阶段三分析时判定完整性等级的依据"
-                               FontWeight="SemiBold" Foreground="#1E3A5F" Margin="0,0,0,8"/>
+                               FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
                     <DataGrid Grid.Row="1" x:Name="IntegrityCriteriaGrid"
                               AutoGenerateColumns="False" CanUserAddRows="True"
                               CanUserDeleteRows="True"
                               CanUserSortColumns="False" HeadersVisibility="Column"
                               CellStyle="{StaticResource CenterCellStyle}"
                               ColumnHeaderStyle="{StaticResource HeaderCellStyle}"
-                              BorderBrush="#90CAF9" BorderThickness="1">
+                              BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
                         <DataGrid.Columns>
                             <DataGridComboBoxColumn Header="完整性等级" SelectedItemBinding="{Binding LevelKey, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="120">
                                 <DataGridComboBoxColumn.ElementStyle>
@@ -170,7 +170,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0" Text="{Binding Key}" Width="180"
-                                               VerticalAlignment="Center" FontWeight="SemiBold" Foreground="#333"/>
+                                               VerticalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}"/>
                                     <TextBox Grid.Column="1" Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                              Padding="6" VerticalContentAlignment="Center" Margin="8,0,0,0"/>
                                 </Grid>
@@ -182,14 +182,11 @@
         </TabControl>
 
         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-            <Button Content="恢复默认" Width="100" Padding="10,6" Margin="0,0,8,0"
-                    Background="#FF9800" Foreground="White" BorderThickness="0"
+            <Button Content="恢复默认" Style="{StaticResource SecondaryButton}" Width="100" Padding="10,6" Margin="0,0,8,0"
                     Click="ResetDefaults_Click"/>
-            <Button Content="取消" Width="100" Padding="10,6" Margin="0,0,8,0"
-                    Background="#9E9E9E" Foreground="White" BorderThickness="0"
+            <Button Content="取消" Style="{StaticResource SecondaryButton}" Width="100" Padding="10,6" Margin="0,0,8,0"
                     Click="Cancel_Click" IsCancel="True"/>
-            <Button Content="保存" Width="100" Padding="10,6"
-                    Background="#4CAF50" Foreground="White" BorderThickness="0"
+            <Button Content="保存" Style="{StaticResource SuccessButton}" Width="100" Padding="10,6"
                     Click="Save_Click" IsDefault="True"/>
         </StackPanel>
     </Grid>

@@ -10,17 +10,17 @@ public class ProjectStatisticsResult
     public int ProjectId { get; set; }
 
     /// <summary>
-    /// 项目岩芯总长度（米），以各钻孔 TotalDepth 之和为准。
+    /// 项目岩心总长度（米），以各钻孔 TotalDepth 之和为准。
     /// </summary>
     public double TotalCoreLength { get; set; }
 
     /// <summary>
-    /// 已分类岩芯总长度（米）。
+    /// 已分类岩心总长度（米）。
     /// </summary>
     public double TotalClassifiedLength { get; set; }
 
     /// <summary>
-    /// 未分类岩芯总长度（米）。
+    /// 未分类岩心总长度（米）。
     /// </summary>
     public double TotalUnclassifiedLength { get; set; }
 
@@ -45,7 +45,7 @@ public class ProjectStatisticsResult
     public string OverallClassSummary { get; set; } = string.Empty;
 
     /// <summary>
-    /// 项目总体围岩分类占比文本（分母 = 已分析岩芯长度之和）。
+    /// 项目总体围岩分类占比文本（分母 = 已分析岩心长度之和）。
     /// </summary>
     public string OverallClassSummaryByAnalyzed { get; set; } = string.Empty;
 }
@@ -62,12 +62,12 @@ public class RockClassStatistics
     public double TotalLength { get; set; }
 
     /// <summary>
-    /// 占比（0~1），分母 = 项目岩芯总长度（钻孔总深度之和）。
+    /// 占比（0~1），分母 = 项目岩心总长度（钻孔总深度之和）。
     /// </summary>
     public double Ratio { get; set; }
 
     /// <summary>
-    /// 占比（0~1），分母 = 项目已分析岩芯长度之和。
+    /// 占比（0~1），分母 = 项目已分析岩心长度之和。
     /// </summary>
     public double RatioByAnalyzed { get; set; }
 
@@ -89,7 +89,7 @@ public class BoreholeStatistics
     public string BoreholeNumber { get; set; } = string.Empty;
 
     /// <summary>
-    /// 钻孔岩芯总长度（米）。
+    /// 钻孔岩心总长度（米）。
     /// </summary>
     public double TotalLength { get; set; }
 
@@ -111,7 +111,7 @@ public class BoreholeStatistics
     public Dictionary<RockClass, double> ClassRatios { get; set; } = new();
 
     /// <summary>
-    /// 各类别占比（分母 = 该钻孔已分析岩芯长度）。
+    /// 各类别占比（分母 = 该钻孔已分析岩心长度）。
     /// </summary>
     public Dictionary<RockClass, double> ClassRatiosByAnalyzed { get; set; } = new();
 
@@ -121,7 +121,7 @@ public class BoreholeStatistics
     public string ClassSummary { get; set; } = string.Empty;
 
     /// <summary>
-    /// 该钻孔围岩分类占比文本（分母 = 已分析岩芯长度）。
+    /// 该钻孔围岩分类占比文本（分母 = 已分析岩心长度）。
     /// </summary>
     public string ClassSummaryByAnalyzed { get; set; } = string.Empty;
 }

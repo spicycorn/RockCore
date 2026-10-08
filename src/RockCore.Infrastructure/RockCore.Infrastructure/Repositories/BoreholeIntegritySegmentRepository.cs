@@ -53,10 +53,12 @@ public class BoreholeIntegritySegmentRepository : IBoreholeIntegritySegmentRepos
         command.CommandText = @"
             INSERT INTO BoreholeIntegritySegments
                 (BoreholeId, DepthStart, DepthEnd, IntegrityLevel, RockType, RockStructureType,
-                 RockHardnessLevel, RockHomogeneity, GroundwaterCondition, CaveAxisAngleLessThan30, CreatedAt, UpdatedAt)
+                 RockHardnessLevel, RockHomogeneity, GroundwaterCondition, CaveAxisAngleLessThan30,
+                 ImportBatchId, CreatedAt, UpdatedAt)
             VALUES
                 (@BoreholeId, @DepthStart, @DepthEnd, @IntegrityLevel, @RockType, @RockStructureType,
-                 @RockHardnessLevel, @RockHomogeneity, @GroundwaterCondition, @CaveAxisAngleLessThan30, @CreatedAt, @UpdatedAt);
+                 @RockHardnessLevel, @RockHomogeneity, @GroundwaterCondition, @CaveAxisAngleLessThan30,
+                 @ImportBatchId, @CreatedAt, @UpdatedAt);
             SELECT last_insert_rowid();";
 
         AddParameters(command, segment);
@@ -74,10 +76,12 @@ public class BoreholeIntegritySegmentRepository : IBoreholeIntegritySegmentRepos
             command.CommandText = @"
                 INSERT INTO BoreholeIntegritySegments
                     (BoreholeId, DepthStart, DepthEnd, IntegrityLevel, RockType, RockStructureType,
-                     RockHardnessLevel, RockHomogeneity, GroundwaterCondition, CaveAxisAngleLessThan30, CreatedAt, UpdatedAt)
+                     RockHardnessLevel, RockHomogeneity, GroundwaterCondition, CaveAxisAngleLessThan30,
+                     ImportBatchId, CreatedAt, UpdatedAt)
                 VALUES
                     (@BoreholeId, @DepthStart, @DepthEnd, @IntegrityLevel, @RockType, @RockStructureType,
-                     @RockHardnessLevel, @RockHomogeneity, @GroundwaterCondition, @CaveAxisAngleLessThan30, @CreatedAt, @UpdatedAt);
+                     @RockHardnessLevel, @RockHomogeneity, @GroundwaterCondition, @CaveAxisAngleLessThan30,
+                     @ImportBatchId, @CreatedAt, @UpdatedAt);
                 SELECT last_insert_rowid();";
             AddParameters(command, segment);
             var result = await command.ExecuteScalarAsync();
@@ -148,6 +152,8 @@ public class BoreholeIntegritySegmentRepository : IBoreholeIntegritySegmentRepos
         command.Parameters.AddWithValue("@GroundwaterCondition", (int)segment.GroundwaterCondition);
         command.Parameters.AddWithValue("@CaveAxisAngleLessThan30",
             segment.CaveAxisAngleLessThan30.HasValue ? (segment.CaveAxisAngleLessThan30.Value ? 1 : 0) : DBNull.Value);
+        command.Parameters.AddWithValue("@ImportBatchId",
+            (object?)segment.ImportBatchId ?? DBNull.Value);
         command.Parameters.AddWithValue("@CreatedAt", segment.CreatedAt.ToString("o"));
         command.Parameters.AddWithValue("@UpdatedAt", segment.UpdatedAt.ToString("o"));
     }
@@ -156,6 +162,11 @@ public class BoreholeIntegritySegmentRepository : IBoreholeIntegritySegmentRepos
     {
         var ordinalCaveAxis = reader.GetOrdinal("CaveAxisAngleLessThan30");
         int? caveAxisValue = reader.IsDBNull(ordinalCaveAxis) ? null : reader.GetInt32(ordinalCaveAxis);
+
+        int? importBatchId = null;
+        var ordinalBatch = reader.GetOrdinal("ImportBatchId");
+        if (!reader.IsDBNull(ordinalBatch))
+            importBatchId = reader.GetInt32(ordinalBatch);
 
         return new BoreholeIntegritySegment
         {
@@ -170,6 +181,7 @@ public class BoreholeIntegritySegmentRepository : IBoreholeIntegritySegmentRepos
             RockHomogeneity = (RockHomogeneity)reader.GetInt32(reader.GetOrdinal("RockHomogeneity")),
             GroundwaterCondition = (GroundwaterCondition)reader.GetInt32(reader.GetOrdinal("GroundwaterCondition")),
             CaveAxisAngleLessThan30 = caveAxisValue.HasValue ? caveAxisValue.Value == 1 : null,
+            ImportBatchId = importBatchId,
             CreatedAt = DateTime.Parse(reader.GetString(reader.GetOrdinal("CreatedAt"))),
             UpdatedAt = reader.IsDBNull(reader.GetOrdinal("UpdatedAt"))
                 ? DateTime.Now

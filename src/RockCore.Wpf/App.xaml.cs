@@ -97,6 +97,7 @@ public partial class App : Application
 
         // 应用服务
         services.AddSingleton<PhotoImportService>();
+        services.AddSingleton<ExcelImportService>();
 
         // 图像分析服务（纯规则引擎，无 AI）
         services.AddSingleton<RuleEngineImageAnalyzer>();

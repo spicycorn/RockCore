@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Data;
+using System.Windows.Media;
 using RockCore.Core.Enums;
 
 namespace RockCore.Wpf;
@@ -215,6 +216,46 @@ public class EnumDescriptionConverter : IValueConverter
 
         var attr = field.GetCustomAttribute<DescriptionAttribute>();
         return attr?.Description ?? value.ToString() ?? string.Empty;
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
+
+// 完整性等级 → 徽标底色（与判定语义绑定的全局统一配色，勿改）
+public class IntegrityLevelBrushConverter : IValueConverter
+{
+    private static readonly Brush IntactBrush = CreateFrozen("#4CAF50");
+    private static readonly Brush RelativelyIntactBrush = CreateFrozen("#2196F3");
+    private static readonly Brush PoorIntegrityBrush = CreateFrozen("#FF9800");
+    private static readonly Brush RelativelyBrokenBrush = CreateFrozen("#FF5722");
+    private static readonly Brush BrokenBrush = CreateFrozen("#F44336");
+    private static readonly Brush UnknownBrush = CreateFrozen("#9E9E9E");
+
+    private static Brush CreateFrozen(string hex)
+    {
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+        brush.Freeze();
+        return brush;
+    }
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (value is IntegrityLevel level)
+        {
+            return level switch
+            {
+                IntegrityLevel.Intact => IntactBrush,
+                IntegrityLevel.RelativelyIntact => RelativelyIntactBrush,
+                IntegrityLevel.Poor => PoorIntegrityBrush,
+                IntegrityLevel.RelativelyBroken => RelativelyBrokenBrush,
+                IntegrityLevel.Broken => BrokenBrush,
+                _ => UnknownBrush
+            };
+        }
+        return UnknownBrush;
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

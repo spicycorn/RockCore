@@ -55,6 +55,12 @@ public partial class BoreholeIntegritySegment : ObservableObject
     public DateTime UpdatedAt { get; set; }
 
     /// <summary>
+    /// 数据来源批次（Excel 导入生成时非空；手工/历史数据为 null）。
+    /// 重复导入时按批次整体替换。
+    /// </summary>
+    public int? ImportBatchId { get; set; }
+
+    /// <summary>
     /// 当前岩质类型 + 完整性等级 对应的可用岩体结构类型列表（严格对应规范表F.0.2）
     /// </summary>
     public RockStructureType[] AvailableRockStructureTypes

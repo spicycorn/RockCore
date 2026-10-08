@@ -30,7 +30,7 @@ public partial class PhotoImportDialogWindow : Window
         _importService = importService;
         _corePhotoRepository = corePhotoRepository;
 
-        Title = $"导入岩芯照片 - {borehole.Number} (孔深 {borehole.TotalDepth:F1}m)";
+        Title = $"导入岩心照片 - {borehole.Number} (孔深 {borehole.TotalDepth:F1}m)";
         PhotosDataGrid.ItemsSource = _rows;
     }
 
@@ -38,7 +38,7 @@ public partial class PhotoImportDialogWindow : Window
     {
         var dialog = new OpenFolderDialog
         {
-            Title = "选择包含岩芯照片的目录"
+            Title = "选择包含岩心照片的目录"
         };
 
         if (dialog.ShowDialog(this) == true)

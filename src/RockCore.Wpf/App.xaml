@@ -3,7 +3,15 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:local="clr-namespace:RockCore.Wpf">
     <Application.Resources>
-        <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
-        <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- 全局设计系统（色板 / 按钮 / 表格 / 标签页 / 菜单 / 窗口默认样式） -->
+                <ResourceDictionary Source="Styles/Theme.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <local:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
+            <local:NotNullToBoolConverter x:Key="NotNullToBoolConverter"/>
+            <local:IntegrityLevelBrushConverter x:Key="IntegrityLevelBrushConverter"/>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
