@@ -7,7 +7,7 @@
              xmlns:local="clr-namespace:RockCore.Wpf"
              xmlns:hx="clr-namespace:HelixToolkit.Wpf;assembly=HelixToolkit.Wpf"
              mc:Ignorable="d">
-    <Grid Background="#F5F5F5">
+    <Grid Background="{StaticResource SurfaceAltBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -15,9 +15,9 @@
         </Grid.RowDefinitions>
 
         <!-- 顶部工具栏 -->
-        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="#DDD" BorderThickness="0,0,0,1" Padding="12,8">
+        <Border Grid.Row="0" Background="#FFFFFF" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
             <StackPanel Orientation="Horizontal">
-                <TextBlock Text="着色模式:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="#555"/>
+                <TextBlock Text="着色模式:" VerticalAlignment="Center" Margin="0,0,8,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                 <ComboBox x:Name="ColorSchemeCombo"
                           ItemsSource="{Binding ColorSchemeOptions}"
                           SelectedValue="{Binding ColorScheme, Mode=TwoWay}"
@@ -25,17 +25,17 @@
                           DisplayMemberPath="DisplayName"
                           Width="140" Margin="0,0,24,0"
                           Background="White"
-                          Foreground="#333"
+                          Foreground="{StaticResource TextPrimaryBrush}"
                           FontSize="12"
                           VerticalAlignment="Center">
                     <ComboBox.Style>
                         <Style TargetType="ComboBox">
-                            <Setter Property="BorderBrush" Value="#DDD"/>
+                            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
                             <Setter Property="BorderThickness" Value="1"/>
-                            <Setter Property="Foreground" Value="#333"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
                             <Style.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="BorderBrush" Value="#4A90D9"/>
+                                    <Setter Property="BorderBrush" Value="{StaticResource PrimaryBrush}"/>
                                 </Trigger>
                             </Style.Triggers>
                         </Style>
@@ -48,17 +48,17 @@
                         FontWeight="Bold">
                     <Button.Style>
                         <Style TargetType="Button">
-                            <Setter Property="Background" Value="#4A90D9"/>
+                            <Setter Property="Background" Value="{StaticResource PrimaryBrush}"/>
                             <Setter Property="Foreground" Value="White"/>
                             <Setter Property="BorderThickness" Value="0"/>
                             <Setter Property="Cursor" Value="Hand"/>
                             <Style.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter Property="Background" Value="#357ABD"/>
+                                    <Setter Property="Background" Value="{StaticResource PrimaryDarkBrush}"/>
                                 </Trigger>
                                 <DataTrigger Binding="{Binding IsLoading}" Value="True">
                                     <Setter Property="IsEnabled" Value="False"/>
-                                    <Setter Property="Background" Value="#90CAF9"/>
+                                    <Setter Property="Background" Value="{StaticResource PrimaryLightBrush}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
@@ -67,15 +67,15 @@
 
                 <StackPanel Orientation="Horizontal" Margin="24,0,0,0">
                     <CheckBox Content="结构面" IsChecked="{Binding ShowStructuralPlanes, Mode=TwoWay}" 
-                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="#555"/>
+                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <CheckBox Content="地下水" IsChecked="{Binding ShowGroundwater, Mode=TwoWay}" 
-                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="#555"/>
+                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <CheckBox Content="深度刻度" IsChecked="{Binding ShowDepthLabels, Mode=TwoWay}" 
-                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="#555"/>
-                    <TextBlock Text="刻度间隔(m):" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="#555"/>
+                              VerticalAlignment="Center" Margin="0,0,16,0" Foreground="{StaticResource TextSecondaryBrush}"/>
+                    <TextBlock Text="刻度间隔(m):" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <TextBox Text="{Binding DepthTickInterval, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,0,0"
                              VerticalAlignment="Center" Padding="4,2"/>
-                    <TextBlock Text="网格间距(m):" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="#555"/>
+                    <TextBlock Text="网格间距(m):" VerticalAlignment="Center" Margin="16,0,8,0" Foreground="{StaticResource TextSecondaryBrush}"/>
                     <TextBox Text="{Binding GridSpacing, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="60" Margin="0,0,0,0"
                              VerticalAlignment="Center" Padding="4,2"/>
                 </StackPanel>
@@ -84,7 +84,7 @@
 
         <ProgressBar Grid.Row="0" Height="4" VerticalAlignment="Bottom"
                      Minimum="0" Maximum="1" Value="{Binding ProgressOffset}"
-                     Background="#E3F2FD" Foreground="#4A90D9"
+                     Background="{StaticResource PrimaryLightBrush}" Foreground="{StaticResource PrimaryBrush}"
                      IsIndeterminate="False"/>
 
         <!-- 三维视口 -->
@@ -119,7 +119,7 @@
                 <TextBlock x:Name="LoadingTip"
                            Text="正在生成三维场景..."
                            HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="#666" FontSize="14"
+                           Foreground="{StaticResource TextSecondaryBrush}" FontSize="14"
                            Background="#FFFFFF99" Padding="12,8">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
@@ -134,65 +134,65 @@
                 </TextBlock>
 
                 <!-- 图例面板 -->
-                <Border Background="#FFFFFFCC" BorderBrush="#DDD" BorderThickness="1" 
+                <Border Background="#FFFFFFCC" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" 
                         CornerRadius="4" Padding="12,8" Width="160"
                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,12">
                     <StackPanel>
-                        <TextBlock Text="{Binding LegendTitle}" FontWeight="Bold" Foreground="#333" FontSize="12" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding LegendTitle}" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,8"/>
                         <ItemsControl ItemsSource="{Binding LegendItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,2,0,0">
-                                        <Rectangle Fill="{Binding Color}" Width="12" Height="12" Margin="0,0,6,0" Stroke="#333" StrokeThickness="0.5"/>
-                                        <TextBlock Text="{Binding Label}" Foreground="#555" FontSize="10" VerticalAlignment="Center"/>
+                                        <Rectangle Fill="{Binding Color}" Width="12" Height="12" Margin="0,0,6,0" Stroke="{StaticResource TextPrimaryBrush}" StrokeThickness="0.5"/>
+                                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                                     </DockPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Separator Margin="0,8,0,8"/>
-                        <TextBlock Text="交互说明" FontWeight="Bold" Foreground="#333" FontSize="12" Margin="0,0,0,6"/>
+                        <TextBlock Text="交互说明" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,6"/>
                         <TextBlock Text="- 左键拖拽：旋转视角&#10;- 滚轮：缩放视图&#10;- 右键拖拽：平移视图" 
-                                  Foreground="#777" FontSize="9" TextWrapping="Wrap"/>
+                                  Foreground="{StaticResource TextSecondaryBrush}" FontSize="9" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
 
                 <!-- 钻孔信息面板 -->
-                <Border Background="#FFFFFFCC" BorderBrush="#DDD" BorderThickness="1" 
+                <Border Background="#FFFFFFCC" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" 
                         CornerRadius="4" Padding="12,8" Width="200"
                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="12,12">
                     <StackPanel>
-                        <TextBlock Text="钻孔信息" FontWeight="Bold" Foreground="#333" FontSize="12" Margin="0,0,0,8"/>
+                        <TextBlock Text="钻孔信息" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}" FontSize="12" Margin="0,0,0,8"/>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="编号:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.Number}" Foreground="#333" FontSize="10" VerticalAlignment="Center" FontWeight="SemiBold"/>
+                            <TextBlock Text="编号:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.Number}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="孔深:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.TotalDepth, StringFormat={}{0:F1}m}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="孔深:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.TotalDepth, StringFormat={}{0:F1}m}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="X坐标:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.OrificeX, StringFormat={}{0:F2}}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="X坐标:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.OrificeX, StringFormat={}{0:F2}}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="Y坐标:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.OrificeY, StringFormat={}{0:F2}}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="Y坐标:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.OrificeY, StringFormat={}{0:F2}}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="Z坐标:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.OrificeZ, StringFormat={}{0:F2}m}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="Z坐标:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.OrificeZ, StringFormat={}{0:F2}m}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="方位角:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.Azimuth, StringFormat={}{0:F1}°}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="方位角:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.Azimuth, StringFormat={}{0:F1}°}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="倾角:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.InclinationAngle, StringFormat={}{0:F1}°}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="倾角:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.InclinationAngle, StringFormat={}{0:F1}°}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                         <DockPanel Margin="0,2,0,0">
-                            <TextBlock Text="地下水:" Width="50" Foreground="#666" FontSize="10" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding SelectedBorehole.GroundwaterDepth, StringFormat={}{0:F1}m}" Foreground="#333" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="地下水:" Width="50" Foreground="{StaticResource TextSecondaryBrush}" FontSize="10" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedBorehole.GroundwaterDepth, StringFormat={}{0:F1}m}" Foreground="{StaticResource TextPrimaryBrush}" FontSize="10" VerticalAlignment="Center"/>
                         </DockPanel>
                     </StackPanel>
                 </Border>
@@ -200,8 +200,8 @@
         </Grid>
 
         <!-- 底部状态栏 -->
-        <Border Grid.Row="2" Background="#F0F0F0" BorderBrush="#DDD" BorderThickness="0,1,0,0" Padding="12,6">
-            <TextBlock Text="{Binding StatusMessage}" Foreground="#666" FontSize="11"/>
+        <Border Grid.Row="2" Background="{StaticResource SurfaceAltBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,6">
+            <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextSecondaryBrush}" FontSize="11"/>
         </Border>
     </Grid>
 </UserControl>

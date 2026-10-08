@@ -270,21 +270,21 @@ public class ExcelImportService
                     SELECT COUNT(DISTINCT ImportBatchId) FROM BoreholeIntegritySegments
                     WHERE BoreholeId = @b AND ImportBatchId IS NOT NULL;";
                 cnt.Parameters.AddWithValue("@b", boreholeId);
-                replaced = Convert.ToInt32(cnt.ExecuteScalar());
+                replaced = Convert.ToInt32(await cnt.ExecuteScalarAsync());
             }
             using (var del = connection.CreateCommand())
             {
                 del.Transaction = transaction;
                 del.CommandText = "DELETE FROM BoreholeIntegritySegments WHERE BoreholeId = @b AND ImportBatchId IS NOT NULL;";
                 del.Parameters.AddWithValue("@b", boreholeId);
-                del.ExecuteNonQuery();
+                await del.ExecuteNonQueryAsync();
             }
             using (var del = connection.CreateCommand())
             {
                 del.Transaction = transaction;
                 del.CommandText = "DELETE FROM ImportBatches WHERE BoreholeId = @b;";
                 del.Parameters.AddWithValue("@b", boreholeId);
-                del.ExecuteNonQuery();
+                await del.ExecuteNonQueryAsync();
             }
 
             // 2. 新批次
@@ -303,7 +303,7 @@ public class ExcelImportService
                               importRows.Count(r => r.Status == ImportRowStatus.Warning);
                 ins.Parameters.AddWithValue("@note", skipped > 0 ? $"跳过 {skipped} 个警告行" : DBNull.Value);
                 ins.Parameters.AddWithValue("@t", DateTime.Now.ToString("o"));
-                batchId = Convert.ToInt32(ins.ExecuteScalar());
+                batchId = Convert.ToInt32(await ins.ExecuteScalarAsync());
             }
 
             // 3. 回次统计 + 完整性分段
@@ -337,7 +337,7 @@ public class ExcelImportService
                     ins.Parameters.AddWithValue("@s", row.AvgSpacingCm);
                     ins.Parameters.AddWithValue("@lvl", (int)row.Level);
                     ins.Parameters.AddWithValue("@t", now.ToString("o"));
-                    ins.ExecuteNonQuery();
+                    await ins.ExecuteNonQueryAsync();
                 }
 
                 using (var ins = connection.CreateCommand())
@@ -367,7 +367,7 @@ public class ExcelImportService
                     ins.Parameters.AddWithValue("@batch", batchId);
                     ins.Parameters.AddWithValue("@t", now.ToString("o"));
                     ins.Parameters.AddWithValue("@t2", now.ToString("o"));
-                    ins.ExecuteNonQuery();
+                    await ins.ExecuteNonQueryAsync();
                 }
             }
 

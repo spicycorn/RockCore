@@ -51,7 +51,7 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty]
     private bool _analysisProgressVisible;
 
-    // ===== 岩芯信息段（由阶段三分析结果自动聚合生成） =====
+    // ===== 岩心信息段（由阶段三分析结果自动聚合生成） =====
     [ObservableProperty]
     private ObservableCollection<BoreholeIntegritySegment> _boreholeIntegritySegments = new();
 
@@ -240,7 +240,7 @@ public partial class MainViewModel : ObservableObject
             $"照片: {photo.FileName}\n" +
             $"深度范围: {photo.DepthStart:F2} m - {photo.DepthEnd:F2} m\n" +
             $"段长: {photo.Length:F2} m\n" +
-            $"岩芯盒编号: {photo.BoxNumber}\n" +
+            $"岩心盒编号: {photo.BoxNumber}\n" +
             $"----------------------------------------\n" +
             $"完整性等级: {integrityText}\n" +
             $"节理数: {photo.JointCount}\n" +
@@ -925,7 +925,7 @@ public partial class MainViewModel : ObservableObject
         if (!segments.Any())
         {
             MessageBox.Show(
-                "当前钻孔没有完整性分段数据。\n\n请先在「岩芯编辑器」中点击「刷新分组」并填写岩质/岩体结构等参数。",
+                "当前钻孔没有完整性分段数据。\n\n请先在「岩心编辑器」中点击「刷新分组」并填写岩质/岩体结构等参数。",
                 "无法分类", MessageBoxButton.OK, MessageBoxImage.Information);
             return;
         }
