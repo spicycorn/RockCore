@@ -38,6 +38,7 @@
                 <MenuItem Header="新建项目" Click="NewProject_Click"/>
                 <MenuItem Header="保存" Click="Save_Click"/>
                 <Separator/>
+                <MenuItem Header="下载导入模板..." Click="DownloadTemplate_Click"/>
                 <MenuItem Header="导入数据表..." Click="ImportData_Click"/>
                 <MenuItem Header="导入岩心照片..." Click="ImportPhotos_Click"/>
                 <MenuItem Header="导出报告..." Click="ExportReport_Click" IsEnabled="False"/>
@@ -368,6 +369,9 @@
                                             <Button x:Name="ImportDataButton" Content="导入数据表" Style="{StaticResource PrimaryButton}"
                                                     Margin="0,0,8,0" Click="ImportData_Click"
                                                     ToolTip="按岩心回次统计模板（一钻孔一文件）导入回次数据，自动判定完整性"/>
+                                            <Button x:Name="DownloadTemplateButton" Content="下载模板" Style="{StaticResource SecondaryButton}"
+                                                    Margin="0,0,8,0" Click="DownloadTemplate_Click"
+                                                    ToolTip="把内置《岩心回次统计导入模板》另存到本机任意目录（离线可用，含填写说明与样板数据）"/>
                                             <Button x:Name="DataSourceButton" Content="数据源管理" Style="{StaticResource SecondaryButton}"
                                                     Margin="0,0,8,0" Click="DataSourceManager_Click"
                                                     ToolTip="查看/删除该钻孔的导入批次"/>

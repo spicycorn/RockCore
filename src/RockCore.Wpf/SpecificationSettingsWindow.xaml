@@ -109,8 +109,9 @@
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Grid.Row="0" Text="表 F.0.4 岩体完整程度划分——用于阶段三分析时判定完整性等级的依据"
-                               FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"/>
+                    <TextBlock Grid.Row="0" Text="表 F.0.4 岩体完整程度划分——自动判级只按「结构面间距」查表；组数与发育程度为地质描述字段，供人工记录，不参与匹配"
+                               FontWeight="SemiBold" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,0,0,8"
+                               TextWrapping="Wrap"/>
                     <DataGrid Grid.Row="1" x:Name="IntegrityCriteriaGrid"
                               AutoGenerateColumns="False" CanUserAddRows="True"
                               CanUserDeleteRows="True"
@@ -145,15 +146,17 @@
                                     </Style>
                                 </DataGridComboBoxColumn.EditingElementStyle>
                             </DataGridComboBoxColumn>
-                            <DataGridTextColumn Header="结构面发育组数" Binding="{Binding JointSetCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                            <DataGridTextColumn Header="结构面间距 (cm)" Binding="{Binding JointSpacing, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
-                            <DataGridTextColumn Header="结构面发育程度" Binding="{Binding JointDevelopment, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="结构面发育组数（不参与判级）" Binding="{Binding JointSetCount, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="结构面间距 (cm) —— 判级依据" Binding="{Binding JointSpacing, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                            <DataGridTextColumn Header="结构面发育程度（不参与判级）" Binding="{Binding JointDevelopment, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
                         </DataGrid.Columns>
                     </DataGrid>
                     <StackPanel Grid.Row="2" Margin="0,8,0,0">
-                        <TextBlock Foreground="Gray" FontStyle="Italic"
-                                   Text="注：结构面间距指主要结构面间距的平均值；行序 = 判定优先级（从上到下逐行匹配，首次匹配即生效）。"/>
-                        <TextBlock Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0"
+                        <TextBlock Foreground="Gray" FontStyle="Italic" TextWrapping="Wrap"
+                                   Text="注：自动判级只使用「结构面间距」。组数是岩体的地质描述量（节理有几组），无法由回次取芯数据算出——旧版本把「回次内节理条数 n−1」当作组数代入，量纲错误会让本表形同虚设，已修正。"/>
+                        <TextBlock Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0" TextWrapping="Wrap"
+                                   Text="结构面间距指主要结构面间距的平均值；行序 = 判定优先级（从上到下逐行匹配，首次匹配即生效）。"/>
+                        <TextBlock Foreground="Gray" FontStyle="Italic" Margin="0,4,0,0" TextWrapping="Wrap"
                                    Text="区间写法：组数如 1~2、&gt;3、—（不限）；间距(cm)如 &gt;95、50~95、≤10、&lt;2、—（不限）。"/>
                     </StackPanel>
                 </Grid>

@@ -15,9 +15,14 @@
         <!-- 文件选择 -->
         <StackPanel Grid.Row="0" Orientation="Horizontal">
             <TextBlock Text="数据表文件" Style="{StaticResource FieldLabel}" VerticalAlignment="Center"/>
-            <TextBox x:Name="FilePathBox" Width="720" Height="28" VerticalContentAlignment="Center"
+            <TextBox x:Name="FilePathBox" Width="420" Height="28" VerticalContentAlignment="Center"
                      IsReadOnly="True" Margin="0,0,8,0"/>
             <Button Content="浏览..." Style="{StaticResource SecondaryButton}" Click="Browse_Click"/>
+            <Button x:Name="DownloadTemplateButton" Content="下载导入模板" Style="{StaticResource SecondaryButton}"
+                    Margin="8,0,0,0" Click="DownloadTemplate_Click"
+                    ToolTip="把内置《岩心回次统计导入模板》另存到本机任意目录（离线可用，含填写说明与自检口径）"/>
+            <TextBlock Text="提示：一个钻孔 = 一个 Excel 文件（文件名即钻孔编号时可自动匹配）"
+                       Style="{StaticResource HintText}" VerticalAlignment="Center" Margin="12,0,0,0"/>
         </StackPanel>
 
         <!-- 导入参数 -->
@@ -39,40 +44,69 @@
             </StackPanel>
         </Border>
 
-        <!-- 预览 -->
-        <DataGrid Grid.Row="2" x:Name="PreviewGrid" Margin="0,10,0,0"
-                  AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
-                  HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                  SelectionMode="Single" Background="White">
-            <DataGrid.RowStyle>
-                <Style TargetType="DataGridRow">
-                    <Style.Triggers>
-                        <DataTrigger Binding="{Binding Status}" Value="Blocked">
-                            <Setter Property="Background" Value="#FDE8E8"/>
-                        </DataTrigger>
-                        <DataTrigger Binding="{Binding Status}" Value="Warning">
-                            <Setter Property="Background" Value="#FFF7E0"/>
-                        </DataTrigger>
-                    </Style.Triggers>
-                </Style>
-            </DataGrid.RowStyle>
-            <DataGrid.Columns>
-                <DataGridTextColumn Header="行" Binding="{Binding RowNumber}" Width="44"/>
-                <DataGridTextColumn Header="回次" Binding="{Binding RunNoText}" Width="48"/>
-                <DataGridTextColumn Header="进尺(m)" Binding="{Binding RunLengthText}" Width="64"/>
-                <DataGridTextColumn Header="碎屑数" Binding="{Binding FragText}" Width="56"/>
-                <DataGridTextColumn Header="段数" Binding="{Binding PieceCount}" Width="48"/>
-                <DataGridTextColumn Header="总长(cm)" Binding="{Binding TotalLengthCm}" Width="70"/>
-                <DataGridTextColumn Header="RQD(%)" Binding="{Binding RqdText}" Width="62"/>
-                <DataGridTextColumn Header="深度区间(m)" Binding="{Binding DepthText}" Width="118"/>
-                <DataGridTextColumn Header="n" Binding="{Binding TotalPieces}" Width="40"/>
-                <DataGridTextColumn Header="J" Binding="{Binding JointCount}" Width="40"/>
-                <DataGridTextColumn Header="S(cm)" Binding="{Binding SpacingText}" Width="56"/>
-                <DataGridTextColumn Header="完整性" Binding="{Binding LevelText}" Width="72"/>
-                <DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="48"/>
-                <DataGridTextColumn Header="说明" Binding="{Binding MessageText}" Width="*"/>
-            </DataGrid.Columns>
-        </DataGrid>
+        <!-- 预览：上=回次明细（采样单元），下=归并后的完整性分段（写入库的评价单元） -->
+        <Grid Grid.Row="2" Margin="0,10,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="0.8*"/>
+            </Grid.RowDefinitions>
+
+            <DataGrid Grid.Row="0" x:Name="PreviewGrid"
+                      AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionMode="Single" Background="White">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding Status}" Value="Blocked">
+                                <Setter Property="Background" Value="#FDE8E8"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Status}" Value="Warning">
+                                <Setter Property="Background" Value="#FFF7E0"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="段号" Binding="{Binding SegmentText}" Width="48"
+                                        ToolTip="该回次归入的完整性分段编号"/>
+                    <DataGridTextColumn Header="行" Binding="{Binding RowNumber}" Width="44"/>
+                    <DataGridTextColumn Header="回次" Binding="{Binding RunNoText}" Width="48"/>
+                    <DataGridTextColumn Header="进尺(m)" Binding="{Binding RunLengthText}" Width="64"/>
+                    <DataGridTextColumn Header="碎屑数" Binding="{Binding FragText}" Width="56"/>
+                    <DataGridTextColumn Header="段数" Binding="{Binding PieceCount}" Width="48"/>
+                    <DataGridTextColumn Header="总长(cm)" Binding="{Binding TotalLengthCm}" Width="70"/>
+                    <DataGridTextColumn Header="RQD(%)" Binding="{Binding RqdText}" Width="62"/>
+                    <DataGridTextColumn Header="深度区间(m)" Binding="{Binding DepthText}" Width="118"/>
+                    <DataGridTextColumn Header="n" Binding="{Binding TotalPieces}" Width="40"/>
+                    <DataGridTextColumn Header="S(cm)" Binding="{Binding SpacingText}" Width="56"/>
+                    <DataGridTextColumn Header="本行完整性" Binding="{Binding LevelText}" Width="82"/>
+                    <DataGridTextColumn Header="状态" Binding="{Binding StatusText}" Width="48"/>
+                    <DataGridTextColumn Header="说明" Binding="{Binding MessageText}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <TextBlock Grid.Row="1" Margin="0,8,0,4" FontSize="12"
+                       Text="完整性分段（相邻回次按平均间距归并后的评价单元 —— 这才是要写入数据库、参与围岩分类的内容）"/>
+
+            <DataGrid Grid.Row="2" x:Name="SegmentGrid"
+                      AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionMode="Single" Background="White">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="段号" Binding="{Binding No}" Width="48"/>
+                    <DataGridTextColumn Header="深度区间(m)" Binding="{Binding DepthText}" Width="118"/>
+                    <DataGridTextColumn Header="段厚(m)" Binding="{Binding ThicknessText}" Width="64"/>
+                    <DataGridTextColumn Header="回次数" Binding="{Binding RunCount}" Width="56"/>
+                    <DataGridTextColumn Header="Σn" Binding="{Binding TotalPieces}" Width="44"/>
+                    <DataGridTextColumn Header="S(cm)" Binding="{Binding SpacingText}" Width="56"/>
+                    <DataGridTextColumn Header="RQD(%)" Binding="{Binding RqdText}" Width="62"/>
+                    <DataGridTextColumn Header="完整程度" Binding="{Binding LevelText}" Width="88"/>
+                    <DataGridTextColumn Header="F.0.2 参数" Binding="{Binding F02Text}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
 
         <!-- 底部 -->
         <Grid Grid.Row="3" Margin="0,10,0,0">

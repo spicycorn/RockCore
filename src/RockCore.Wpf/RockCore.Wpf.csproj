@@ -23,4 +23,15 @@
     <ProjectReference Include="..\RockCore.Infrastructure\RockCore.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!--
+      内置《岩心回次统计导入模板》：以嵌入资源随 exe 分发，界面「下载导入模板」直接另存，
+      离线可用、不依赖安装目录是否带有模板文件。
+      模板唯一来源仍是 docs\templates\（避免仓库内出现两份会漂移的副本）；
+      LogicalName 用 ASCII，规避中文资源名在资源解析上的编码风险。
+    -->
+    <EmbeddedResource Include="..\..\docs\templates\岩心回次统计导入模板.xlsx"
+                      LogicalName="RockCore.Wpf.Assets.Templates.CoreRunTemplate.xlsx" />
+  </ItemGroup>
+
 </Project>

@@ -45,14 +45,18 @@ public class ExcelImportRow
     public ImportRowStatus Status { get; set; } = ImportRowStatus.Ok;
     public List<string> Messages { get; } = new();
 
+    /// <summary>归入的完整性分段编号（1 起；0 = 未归入，如被阻断行）。</summary>
+    public int SegmentNo { get; set; }
+
     // ===== 预览界面显示用 =====
     public string RunNoText => RunNo?.ToString() ?? "—";
     public string RunLengthText => RunLengthM?.ToString("0.00") ?? "—";
     public string FragText => FragCount?.ToString() ?? "—";
-    public string RqdText => Rqd?.ToString("0.0") ?? "—";
+    public string RqdText => Rqd?.ToString("0.00") ?? "—";
     public string DepthText => $"{DepthStart:0.00} → {DepthEnd:0.00}";
-    public string SpacingText => AvgSpacingCm > 0 ? AvgSpacingCm.ToString("0.0") : "—";
+    public string SpacingText => AvgSpacingCm > 0 ? AvgSpacingCm.ToString("0.00") : "—";
     public string LevelText => Level.GetDescription();
+    public string SegmentText => SegmentNo > 0 ? SegmentNo.ToString() : "—";
     public string StatusText => Status switch
     {
         ImportRowStatus.Ok => "正常",
@@ -62,11 +66,47 @@ public class ExcelImportRow
     public string MessageText => string.Join("；", Messages);
 }
 
+/// <summary>
+/// 完整性分段（岩体段）：由相邻、平均间距相近的回次归并而成，是规范意义上的评价单元。
+/// 指标为组内合并口径：S = 段厚×100÷Σn、RQD = Σ合格段长÷(段厚×100)×100。
+/// </summary>
+public class ExcelImportSegment
+{
+    public int No { get; set; }
+    public double DepthStart { get; set; }
+    public double DepthEnd { get; set; }
+    public double ThicknessM { get; set; }
+    public int RunCount { get; set; }
+    public int TotalPieces { get; set; }
+    public double SpacingCm { get; set; }
+    public double Rqd { get; set; }
+    public IntegrityLevel Level { get; set; } = IntegrityLevel.Unknown;
+
+    /// <summary>F.0.2 六列取自组内填写最完整的那个回次。</summary>
+    public ExcelImportRow? F02Source { get; set; }
+
+    public string DepthText => $"{DepthStart:0.00} → {DepthEnd:0.00}";
+    public string ThicknessText => ThicknessM.ToString("0.00");
+    public string SpacingText => SpacingCm > 0 ? SpacingCm.ToString("0.00") : "—";
+    public string RqdText => Rqd.ToString("0.00");
+    public string LevelText => Level.GetDescription();
+    public string F02Text => F02Source == null || !F02Source.F02Complete
+        ? "未填全（导入后可在分段中补填）"
+        : "已填全";
+}
+
 public class ExcelImportPreview
 {
     public string FilePath { get; set; } = string.Empty;
     public string? Error { get; set; }
     public List<ExcelImportRow> Rows { get; } = new();
+
+    /// <summary>归并后的完整性分段（= 实际写入 BoreholeIntegritySegments 的内容）。</summary>
+    public List<ExcelImportSegment> Segments { get; } = new();
+
+    /// <summary>归并口径说明，直接展示在导入对话框底部。</summary>
+    public string SegmentNote { get; set; } = string.Empty;
+
     public int OkCount => Rows.Count(r => r.Status == ImportRowStatus.Ok);
     public int WarnCount => Rows.Count(r => r.Status == ImportRowStatus.Warning);
     public int BlockCount => Rows.Count(r => r.Status == ImportRowStatus.Blocked);
@@ -82,9 +122,18 @@ public class ExcelImportResult
 
 /// <summary>
 /// 岩心回次统计 Excel 导入服务（模板 v4：一钻孔一文件，「数据录入」+「计算成果」双表）。
-/// 铁律：完整性判定复用 IntegrityCriteriaEngine（表 F.0.4），判定输入 J/S 全部由原始数据重算：
-///   n = ≥10cm段数 + 碎屑数；J = n − 1；S = 进尺×100÷n (cm)。
-/// 判级与兜底逻辑与绘制模式 RuleEngineImageAnalyzer.JudgeSegmentDouble 完全一致。
+///
+/// 数据链（三层，顺序不可颠倒）：
+///   回次（采样单元，一行一个回次）
+///     → 岩体段（评价单元：相邻、平均间距相近的回次归并，见 <see cref="RockMassSegmentBuilder"/>）
+///       → 完整性分段（对归并段判级后写入 BoreholeIntegritySegments）
+///
+/// 铁律：
+///   · 全部派生指标由原始数据重算，不信任 Excel 公式列；
+///     n = ≥10cm段数 + 碎屑数；S = 进尺×100÷n (cm)；RQD = ΣL÷(进尺×100)×100；
+///   · 判级只按平均间距 S 查表 F.0.4——「结构面发育组数」是地质描述量，回次取芯算不出它，
+///     旧实现把"回次内节理条数 n−1"当组数代入，量纲错误导致判定表形同虚设；
+///   · 先归并、后判级：归并只用原始量（进尺/段数/段长/岩质），不用判级结果。
 /// </summary>
 public class ExcelImportService
 {
@@ -203,19 +252,20 @@ public class ExcelImportService
                     row.DepthEnd = Math.Round(depthCursor + runLen.Value, 3);
                     depthCursor += runLen.Value;
 
+                    // 小数位与模板「计算成果」表一致：RQD、平均间距均保留 2 位
                     row.Rqd = row.PieceCount > 0
-                        ? Math.Round(row.TotalLengthCm / (runLen.Value * 100) * 100, 1)
+                        ? Math.Round(row.TotalLengthCm / (runLen.Value * 100) * 100, 2)
                         : 0;
                     row.TotalPieces = n;
                     row.JointCount = Math.Max(0, n - 1);
-                    row.AvgSpacingCm = n > 0 ? Math.Round(runLen.Value * 100 / n, 1) : 0;
+                    row.AvgSpacingCm = n > 0 ? Math.Round(runLen.Value * 100 / n, 2) : 0;
 
                     if (row.AvgSpacingCm > 500 && row.Status != ImportRowStatus.Blocked)
                     {
                         row.Messages.Add("平均间距 >500cm，疑似段长按 mm 误填");
                         row.Status = ImportRowStatus.Warning;
                     }
-                    row.Level = Judge(row.JointCount, row.AvgSpacingCm);
+                    row.Level = Judge(row.AvgSpacingCm);
                 }
 
                 // ===== F.0.2 六列（计算成果表，同行对齐）=====
@@ -226,7 +276,14 @@ public class ExcelImportService
             }
 
             if (preview.Rows.Count == 0)
+            {
                 preview.Error = $"「{InputSheetName}」中没有数据行";
+                return preview;
+            }
+
+            // 归并成完整性分段（预览默认锚点 0；导入时会按实际锚点重算）
+            RebuildSegments(preview,
+                preview.Rows.Where(r => r.Status != ImportRowStatus.Blocked).ToList());
             return preview;
         }
     }
@@ -256,6 +313,11 @@ public class ExcelImportService
             row.DepthEnd = Math.Round(cursor + row.RunLengthM!.Value, 3);
             cursor += row.RunLengthM.Value;
         }
+
+        // 锚点变了，按最终深度与实际入库的行集重算归并结果
+        RebuildSegments(preview, importRows);
+        if (preview.Segments.Count == 0)
+            return new ExcelImportResult { Message = "没有可导入的回次（进尺均为 0）" };
 
         var connection = _context.GetConnection();
         using var transaction = connection.BeginTransaction();
@@ -306,7 +368,7 @@ public class ExcelImportService
                 batchId = Convert.ToInt32(await ins.ExecuteScalarAsync());
             }
 
-            // 3. 回次统计 + 完整性分段
+            // 3. 回次统计：一个回次一条，保留原始采样记录（可溯源）
             var now = DateTime.Now;
             foreach (var row in importRows)
             {
@@ -339,7 +401,12 @@ public class ExcelImportService
                     ins.Parameters.AddWithValue("@t", now.ToString("o"));
                     await ins.ExecuteNonQueryAsync();
                 }
+            }
 
+            // 4. 完整性分段：一个岩体段一条（归并后的评价单元，判级在此层进行）
+            foreach (var seg in preview.Segments)
+            {
+                var f02 = seg.F02Source;
                 using (var ins = connection.CreateCommand())
                 {
                     ins.Transaction = transaction;
@@ -353,17 +420,17 @@ public class ExcelImportService
                              @rh, @hom, @gw,
                              @cave, @batch, @t, @t2);";
                     ins.Parameters.AddWithValue("@b", boreholeId);
-                    ins.Parameters.AddWithValue("@ds", row.DepthStart);
-                    ins.Parameters.AddWithValue("@de", row.DepthEnd);
-                    ins.Parameters.AddWithValue("@lvl", (int)row.Level);
-                    ins.Parameters.AddWithValue("@rt", (int)row.RockType);
-                    ins.Parameters.AddWithValue("@rs", (int)row.RockStructure);
-                    ins.Parameters.AddWithValue("@rh", (int)row.Hardness);
-                    ins.Parameters.AddWithValue("@hom", (int)row.Homogeneity);
-                    ins.Parameters.AddWithValue("@gw", (int)row.Groundwater);
+                    ins.Parameters.AddWithValue("@ds", seg.DepthStart);
+                    ins.Parameters.AddWithValue("@de", seg.DepthEnd);
+                    ins.Parameters.AddWithValue("@lvl", (int)seg.Level);
+                    ins.Parameters.AddWithValue("@rt", (int)(f02?.RockType ?? RockType.NotSet));
+                    ins.Parameters.AddWithValue("@rs", (int)(f02?.RockStructure ?? RockStructureType.NotSet));
+                    ins.Parameters.AddWithValue("@rh", (int)(f02?.Hardness ?? RockHardnessLevel.NotSet));
+                    ins.Parameters.AddWithValue("@hom", (int)(f02?.Homogeneity ?? RockHomogeneity.NotSet));
+                    ins.Parameters.AddWithValue("@gw", (int)(f02?.Groundwater ?? GroundwaterCondition.NotSet));
                     ins.Parameters.AddWithValue("@cave",
-                        row.CaveAxisAngleLessThan30.HasValue
-                            ? (row.CaveAxisAngleLessThan30.Value ? 1 : 0) : DBNull.Value);
+                        f02 != null && f02.CaveAxisAngleLessThan30.HasValue
+                            ? (f02.CaveAxisAngleLessThan30.Value ? 1 : 0) : DBNull.Value);
                     ins.Parameters.AddWithValue("@batch", batchId);
                     ins.Parameters.AddWithValue("@t", now.ToString("o"));
                     ins.Parameters.AddWithValue("@t2", now.ToString("o"));
@@ -372,14 +439,17 @@ public class ExcelImportService
             }
 
             transaction.Commit();
+            var mergedNote = preview.Segments.Count < importRows.Count
+                ? $"，归并为 {preview.Segments.Count} 个完整性分段"
+                : string.Empty;
             return new ExcelImportResult
             {
                 Success = true,
                 ImportedCount = importRows.Count,
                 ReplacedBatchCount = replaced,
                 Message = replaced > 0
-                    ? $"已导入 {importRows.Count} 个回次，并替换此前的 {replaced} 个导入批次"
-                    : $"已导入 {importRows.Count} 个回次"
+                    ? $"已导入 {importRows.Count} 个回次{mergedNote}，并替换此前的 {replaced} 个导入批次"
+                    : $"已导入 {importRows.Count} 个回次{mergedNote}"
             };
         }
         catch
@@ -430,33 +500,122 @@ public class ExcelImportService
     }
 
     // ====================================================================
-    // 判级：与 RuleEngineImageAnalyzer.JudgeSegmentDouble 完全一致
+    // 归并：回次（采样单元）→ 完整性分段（评价单元）
     // ====================================================================
-    private IntegrityLevel Judge(int jointCount, double spacingCm)
+
+    /// <summary>
+    /// 把参与入库的回次归并成完整性分段，并回填每行的段号。
+    /// 归并只在"将入库的行"之间进行：被排除/阻断的行留下深度空洞，天然成为分界。
+    /// 预览与导入各调用一次（导入时深度锚点可能已改，需按新深度重算）。
+    /// </summary>
+    private void RebuildSegments(ExcelImportPreview preview, IReadOnlyList<ExcelImportRow> groupable)
     {
+        preview.Segments.Clear();
+        foreach (var row in preview.Rows) row.SegmentNo = 0;
+
+        var thresholds = _specificationService?.CurrentConfig?.ConfigThresholds
+                         ?? new RockSpecificationConfig.Thresholds();
+
+        var sources = groupable.Where(r => r.RunLengthM > 0).ToList();
+        var byKey = sources.ToDictionary(r => r.RowNumber);
+        var inputs = sources.Select(r => new RockMassRunInput
+        {
+            Key = r.RowNumber,
+            DepthStart = r.DepthStart,
+            DepthEnd = r.DepthEnd,
+            TotalPieces = r.TotalPieces,
+            TotalLengthCm = r.TotalLengthCm,
+            RockTypeKey = (int)r.RockType,
+        }).ToList();
+
+        var built = thresholds.MergeRunsIntoRockSegments
+            ? RockMassSegmentBuilder.Build(
+                inputs, thresholds.RockSegmentMinThicknessM, thresholds.RockSegmentSpacingToleranceRatio)
+            : RockMassSegmentBuilder.BuildOnePerRun(inputs);
+
+        var no = 0;
+        foreach (var seg in built)
+        {
+            no++;
+            var model = new ExcelImportSegment
+            {
+                No = no,
+                DepthStart = seg.DepthStart,
+                DepthEnd = seg.DepthEnd,
+                ThicknessM = seg.ThicknessM,
+                RunCount = seg.RunCount,
+                TotalPieces = seg.TotalPieces,
+                SpacingCm = seg.SpacingCm,
+                Rqd = seg.Rqd,
+                Level = Judge(seg.SpacingCm),
+            };
+            foreach (var run in seg.Runs)
+            {
+                if (!byKey.TryGetValue(run.Key, out var src)) continue;
+                src.SegmentNo = no;
+                var best = model.F02Source;
+                if (best == null || F02Score(src) > F02Score(best))
+                    model.F02Source = src;   // 多回次归并时取填得最全的那个回次的 F.0.2
+            }
+            preview.Segments.Add(model);
+        }
+
+        preview.SegmentNote = !thresholds.MergeRunsIntoRockSegments
+            ? "未启用回次归并（一个回次 = 一个完整性分段）"
+            : $"{sources.Count} 个回次 → {preview.Segments.Count} 个完整性分段" +
+              $"（最小段厚 {thresholds.RockSegmentMinThicknessM:0.##}m，" +
+              $"间距容差 {thresholds.RockSegmentSpacingToleranceRatio:P0}）";
+    }
+
+    /// <summary>F.0.2 六列的填写完整度，用于归并段挑选参数来源。</summary>
+    private static int F02Score(ExcelImportRow r)
+    {
+        var score = 0;
+        if (r.RockType != RockType.NotSet) score++;
+        if (r.RockStructure != RockStructureType.NotSet) score++;
+        if (r.Hardness != RockHardnessLevel.NotSet) score++;
+        if (r.Homogeneity != RockHomogeneity.NotSet) score++;
+        if (r.Groundwater != GroundwaterCondition.NotSet) score++;
+        if (r.CaveAxisAngleLessThan30.HasValue) score++;
+        return score;
+    }
+
+    // ====================================================================
+    // 判级：只按平均间距查表 F.0.4
+    // ====================================================================
+
+    /// <summary>
+    /// 判级。<b>只使用平均间距</b>：「结构面发育组数」不参与匹配（见
+    /// <see cref="IntegrityCriteriaEngine.TryMatchBySpacing"/>）。
+    /// 默认表已覆盖 S&gt;0 的全部区间；S≤0 说明该段没有任何结构面计数，保守按"完整性差"。
+    /// </summary>
+    private IntegrityLevel Judge(double spacingCm)
+    {
+        if (spacingCm <= 0) return IntegrityLevel.Poor;
+
         var criteria = _specificationService?.CurrentConfig?.IntegrityLevelCriteria;
         if (criteria == null || criteria.Count == 0)
             criteria = IntegrityCriteriaEngine.GetDefaultCriteria();
 
-        if (spacingCm > 0)
+        var hit = IntegrityCriteriaEngine.TryMatchBySpacing(criteria, spacingCm);
+        if (hit != null)
         {
-            var hit = IntegrityCriteriaEngine.TryMatch(criteria, jointCount, spacingCm);
-            if (hit != null)
-            {
-                var level = IntegrityCriteriaEngine.ParseLevel(hit.LevelKey);
-                if (level != IntegrityLevel.Unknown)
-                    return level;
-            }
+            var level = IntegrityCriteriaEngine.ParseLevel(hit.LevelKey);
+            if (level != IntegrityLevel.Unknown)
+                return level;
         }
 
-        // 无匹配时仅按间距兜底（与绘制模式一致）
-        if (spacingCm > 95) return IntegrityLevel.Intact;
-        if (spacingCm > 50) return IntegrityLevel.RelativelyIntact;
-        if (spacingCm > 30) return IntegrityLevel.RelativelyIntact;
-        if (spacingCm > 10) return IntegrityLevel.Poor;
-        if (spacingCm > 2) return IntegrityLevel.Poor;
-        if (spacingCm > 0) return IntegrityLevel.Broken;
-        return IntegrityLevel.Poor;
+        // 用户把判定表改坏（区间写空/写错）导致无匹配时按间距兜底，避免整孔 Unknown。
+        // 分档与内置默认表一致。
+        return spacingCm switch
+        {
+            > 95 => IntegrityLevel.Intact,
+            > 50 => IntegrityLevel.RelativelyIntact,
+            > 30 => IntegrityLevel.RelativelyIntact,
+            > 10 => IntegrityLevel.Poor,
+            > 2 => IntegrityLevel.RelativelyBroken,
+            _ => IntegrityLevel.Broken
+        };
     }
 
     // ====================================================================

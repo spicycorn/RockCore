@@ -102,6 +102,11 @@ public partial class MainWindow : Window
     /// </summary>
     private async Task SelectBoreholeAndLoadAsync(BoreholeViewModel boreholeVm)
     {
+        // 选中钻孔时同步其所属项目：导入对话框等"按项目取钻孔清单"的逻辑依赖 SelectedProject，
+        // 不同步会误报"请先选择项目"，或把数据导入到另一个项目的同名钻孔。
+        var owner = _viewModel.Projects.FirstOrDefault(p => p.Id == boreholeVm.ProjectId);
+        if (owner != null) _viewModel.SelectedProject = owner;
+
         _viewModel.SelectedBorehole = boreholeVm;
         await _viewModel.LoadCorePhotosForSelectedBoreholeAsync();
         await _viewModel.LoadBoreholeIntegritySegmentsAsync();
@@ -1021,30 +1026,60 @@ public partial class MainWindow : Window
 
     // ===== 数据导入（Excel 模板 v4）=====
 
+    /// <summary>
+    /// 下载《岩心回次统计导入模板》：模板内置在程序集内，另存到用户选定目录（菜单 + 工具栏共用）。
+    /// </summary>
+    private void DownloadTemplate_Click(object sender, RoutedEventArgs e)
+        => ImportTemplateProvider.DownloadWithDialog(this);
+
     private async void ImportData_Click(object sender, RoutedEventArgs e)
     {
-        var project = _viewModel.SelectedProject;
+        // 目标项目以"选中的钻孔"为准，其次才是选中的项目节点：
+        // 只点中钻孔而未点项目节点时 SelectedProject 可能为空、甚至指向另一个项目，
+        // 直接用它要么误报"请先选择项目"，要么把数据导进另一个项目的同名钻孔。
+        var current = _viewModel.SelectedBorehole;
+        var project = current != null
+            ? _viewModel.Projects.FirstOrDefault(p => p.Id == current.ProjectId)
+            : _viewModel.SelectedProject;
         if (project == null)
         {
-            MessageBox.Show(this, "请先在左侧选择项目", "提示", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this,
+                "请先在左侧选择项目或项目下的钻孔，再导入数据表。\n\n（一个 Excel 文件对应一个钻孔，需要先有钻孔才能导入）",
+                "无法导入", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+        if (project.Boreholes.Count == 0)
+        {
+            MessageBox.Show(this,
+                $"项目「{project.Name}」下还没有钻孔。\n\n请先在「编辑 → 新建钻孔」创建钻孔" +
+                "（编号建议与 Excel 文件名一致，导入时可自动匹配），再导入数据表。",
+                "无法导入", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        var dialog = new ExcelImportDialogWindow(_excelImportService, project.Boreholes, _viewModel.SelectedBorehole)
+        var dialog = new ExcelImportDialogWindow(_excelImportService, project.Boreholes, current)
         {
             Owner = this
         };
-        if (dialog.ShowDialog() == true)
+        if (dialog.ShowDialog() != true) return;
+
+        // 导入成功后必须让用户立刻看到结果：
+        // 导入目标与当前选中钻孔不一致时，把选中项切到导入的那个钻孔，否则界面仍是旧钻孔的分段，
+        // 看起来就像"没导入进去"。
+        var target = project.Boreholes.FirstOrDefault(b => b.Id == dialog.ImportedBoreholeId);
+        if (target != null && (current == null || target.Id != current.Id))
         {
-            _viewModel.StatusMessage = $"已导入岩心数据表（钻孔 {dialog.ImportedBoreholeNumber}）";
-            if (dialog.ImportedBoreholeId != null &&
-                _viewModel.SelectedBorehole != null &&
-                dialog.ImportedBoreholeId == _viewModel.SelectedBorehole.Id)
-            {
-                await _viewModel.LoadBoreholeIntegritySegmentsAsync();
-                RefreshIntegrityGrids();
-            }
+            await SelectBoreholeAndLoadAsync(target);
         }
+        else
+        {
+            await _viewModel.LoadBoreholeIntegritySegmentsAsync();
+            await _viewModel.LoadClassificationSegmentsAsync();
+            RefreshIntegrityGrids();
+        }
+        MainTabControl.SelectedIndex = 1;   // 岩心编辑器：完整性分段就在这一页
+        _viewModel.StatusMessage =
+            $"已导入岩心数据表（钻孔 {dialog.ImportedBoreholeNumber}，{dialog.ImportedRowCount} 个回次）";
     }
 
     private async void DataSourceManager_Click(object sender, RoutedEventArgs e)

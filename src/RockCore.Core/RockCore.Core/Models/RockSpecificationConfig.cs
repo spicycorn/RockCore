@@ -27,7 +27,8 @@ public class RockSpecificationConfig
     public Dictionary<string, List<int>> StructureMappings { get; set; } = new();
 
     /// <summary>
-    /// 岩体完整程度划分表（规范表 F.0.4），按完整性等级列出结构面发育组数、间距和发育程度。
+    /// 岩体完整程度划分表（规范表 F.0.4），按完整性等级列出结构面间距（判级依据）、
+    /// 结构面发育组数与发育程度（后两者为地质描述字段，自动判级不使用，见 IntegrityCriteriaEngine）。
     /// </summary>
     public List<IntegrityLevelCriterion> IntegrityLevelCriteria { get; set; } = new();
 
@@ -37,23 +38,43 @@ public class RockSpecificationConfig
         /// 洞轴线与岩层走向夹角判定阈值（默认 30 度）
         /// </summary>
         public double CaveAxisAngleThreshold { get; set; } = 30.0;
+
+        /// <summary>
+        /// 是否把相邻回次归并成「岩体段」后再判完整程度（默认 true）。
+        /// 规范的评价单元是"岩体性质相对均一的连续段"，回次只是采样单元；
+        /// 置为 false 时退回"一个回次 = 一个完整性分段"的旧行为。
+        /// </summary>
+        public bool MergeRunsIntoRockSegments { get; set; } = true;
+
+        /// <summary>
+        /// 岩体段最小厚度（m，默认 1.0）。归并后仍不足该厚度的薄段并入间距最接近的相邻段。
+        /// </summary>
+        public double RockSegmentMinThicknessM { get; set; } = 1.0;
+
+        /// <summary>
+        /// 归并容差：相邻回次的平均间距与当前段合并间距的相对差超过该比例时另起一段（默认 0.5，即 50%）。
+        /// </summary>
+        public double RockSegmentSpacingToleranceRatio { get; set; } = 0.5;
     }
 }
 
 /// <summary>
-/// 单个完整性等级的判定指标，对应规范表 F.0.4 的一列。
+/// 单个完整性等级的判定指标，对应规范表 F.0.4 的一行。
 /// </summary>
 public class IntegrityLevelCriterion
 {
     /// <summary>完整性等级键名，如 Intact / RelativelyIntact / Poor / RelativelyBroken / Broken</summary>
     public string LevelKey { get; set; } = string.Empty;
 
-    /// <summary>结构面发育组数，如 "1~2"</summary>
+    /// <summary>
+    /// 结构面发育组数，如 "1~2"。
+    /// 地质描述字段：自动判级<b>不</b>使用它（回次取芯算不出节理组数），仅在规范设置中供人工记录。
+    /// </summary>
     public string JointSetCount { get; set; } = string.Empty;
 
-    /// <summary>结构面间距（cm），如 ">100"</summary>
+    /// <summary>结构面间距（cm），如 ">95"。自动判级的唯一依据。</summary>
     public string JointSpacing { get; set; } = string.Empty;
 
-    /// <summary>结构面发育程度，如 "不发育"</summary>
+    /// <summary>结构面发育程度，如 "不发育"。地质描述字段，不参与判级。</summary>
     public string JointDevelopment { get; set; } = string.Empty;
 }

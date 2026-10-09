@@ -7,10 +7,14 @@ namespace RockCore.Core.Services;
 /// <summary>
 /// 表 F.0.4「岩体完整程度划分」判定引擎。
 /// 判定依据为可配置的 <see cref="IntegrityLevelCriterion"/> 表（规范设置中可编辑），
-/// 配置为空时回退到内置默认表（与历史版本行为一致，不改变默认判定依据）。
+/// 配置为空时回退到内置默认表。
+///
+/// 自动判级（Excel 导入）走 <see cref="TryMatchBySpacing"/>：<b>只按结构面间距查表</b>，
+/// 「结构面发育组数」不参与匹配——组数是地质描述量，回次取芯数据算不出它。
+/// <see cref="TryMatch"/> 保留给组数确已知的场景。
 ///
 /// 区间记法（与规范表写法一致，大小写不敏感）：
-///   结构面发育组数（整数）：
+///   结构面发育组数（整数，仅 TryMatch 使用）：
 ///     "1~2" → 1 ≤ J ≤ 2
 ///     "&gt;3"  → J &gt; 3
 ///     "—" / "——" / 空 → 不限制
@@ -26,27 +30,58 @@ namespace RockCore.Core.Services;
 public static class IntegrityCriteriaEngine
 {
     /// <summary>
-    /// 内置默认判定表。与历史硬编码判定逻辑一致（完整边界 95cm 的项目经验调整值）。
-    /// 行序 = 优先级（首次匹配即返回）：第 1 行"间距&lt;2cm（无序）→破碎"优先级最高，
-    /// 与历史逻辑中"先判 S&lt;2 → 破碎"的行为完全一致。
+    /// 内置默认判定表（表 F.0.4）。
+    ///
+    /// 【逻辑修正说明】自动判级**只使用「结构面间距」**，「结构面发育组数」不再参与匹配
+    /// （见 <see cref="TryMatchBySpacing"/>）。原因：组数是岩体的地质描述量（节理**组数**，
+    /// 取值 1~2 / 2~3 / >3），无法由回次取芯数据算出；旧实现把"回次内节理条数 n−1"当作组数代入，
+    /// 量纲差 1~2 个数量级，导致 J&gt;3 且 S&gt;10 的组合在表里一行都匹配不上、只能走兜底分支。
+    /// 表中的**间距分档与等级映射数值保持原样未动**；「组数」列保留为地质描述字段（默认"—"）。
+    ///
+    /// 行序 = 优先级（首次匹配即返回）：破碎行置顶，保持"间距&lt;2cm → 破碎"的最高优先级。
     /// 用户可在「规范设置 → 岩体完整程度划分表」中自行修改取值与行序。
     /// </summary>
     public static List<IntegrityLevelCriterion> GetDefaultCriteria()
     {
         return new List<IntegrityLevelCriterion>
         {
-            new() { LevelKey = "Broken",           JointSetCount = "—",   JointSpacing = "<2",   JointDevelopment = "——" },
-            new() { LevelKey = "Intact",           JointSetCount = "1~2", JointSpacing = ">95",  JointDevelopment = "不发育" },
-            new() { LevelKey = "RelativelyIntact", JointSetCount = "1~2", JointSpacing = "50~95",JointDevelopment = "轻度发育" },
-            new() { LevelKey = "RelativelyIntact", JointSetCount = "2~3", JointSpacing = "30~50",JointDevelopment = "中等发育" },
-            new() { LevelKey = "Poor",             JointSetCount = "2~3", JointSpacing = "10~30",JointDevelopment = "较发育" },
-            new() { LevelKey = "Poor",             JointSetCount = "2~3", JointSpacing = "≤10",  JointDevelopment = "发育" },
-            new() { LevelKey = "RelativelyBroken", JointSetCount = ">3",  JointSpacing = "≤10",  JointDevelopment = "很发育" }
+            new() { LevelKey = "Broken",           JointSetCount = "—", JointSpacing = "<2"   },
+            new() { LevelKey = "RelativelyBroken", JointSetCount = "—", JointSpacing = "2~10" },
+            new() { LevelKey = "Poor",             JointSetCount = "—", JointSpacing = "10~30" },
+            new() { LevelKey = "RelativelyIntact", JointSetCount = "—", JointSpacing = "30~50" },
+            new() { LevelKey = "RelativelyIntact", JointSetCount = "—", JointSpacing = "50~95" },
+            new() { LevelKey = "Intact",           JointSetCount = "—", JointSpacing = ">95"  }
         };
     }
 
     /// <summary>
+    /// 仅按「结构面间距」查找首次匹配行（按行序，第 1 行优先）——自动判级的唯一入口。
+    /// 刻意忽略 <see cref="IntegrityLevelCriterion.JointSetCount"/>：组数不是回次能测出的量，
+    /// 让它参与匹配只会让表形同虚设（详见 <see cref="GetDefaultCriteria"/> 的说明）。
+    /// </summary>
+    public static IntegrityLevelCriterion? TryMatchBySpacing(
+        IReadOnlyList<IntegrityLevelCriterion>? criteria,
+        double spacingCm)
+    {
+        if (criteria == null || criteria.Count == 0)
+            return null;
+
+        foreach (var c in criteria)
+        {
+            if (!ParseSpacingRange(c.JointSpacing, out var sMin, out var sMinInclusive,
+                    out var sMax, out var sMaxInclusive, out _))
+                continue;
+            if (sMinInclusive ? spacingCm < sMin : spacingCm <= sMin) continue;
+            if (sMaxInclusive ? spacingCm > sMax : spacingCm >= sMax) continue;
+            return c;
+        }
+        return null;
+    }
+
+    /// <summary>
     /// 在判定表中查找首次匹配行（按行序，第 1 行优先）。
+    /// 保留给"组数确已知"的场景（如人工地质描述、历史图像分析路径）；
+    /// Excel 导入的自动判级请走 <see cref="TryMatchBySpacing"/>。
     /// </summary>
     public static IntegrityLevelCriterion? TryMatch(
         IReadOnlyList<IntegrityLevelCriterion>? criteria,

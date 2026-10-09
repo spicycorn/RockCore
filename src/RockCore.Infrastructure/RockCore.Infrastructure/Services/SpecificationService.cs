@@ -92,20 +92,20 @@ public class SpecificationService : ISpecificationService
         // F.0.4 完整程度划分表：
         //   1) 配置缺失（空）时填充默认值；
         //   2) 用户已修改的判定表绝不覆盖（行序 = 优先级，尊重用户设置）；
-        //   3) 定向迁移：旧版默认表（破碎行在末尾）迁移为新行序（破碎行置顶），
-        //      保持"间距<2cm → 破碎"的最高优先级与历史行为一致。
+        //   3) 定向迁移：仅当现存表与"内置默认表"逐行完全一致（说明用户从未改过）时，
+        //      才替换为当前默认表。历史两版默认表都要覆盖：
+        //        v1 —— 7 行、破碎行在末尾、组数列参与匹配；
+        //        v2 —— 7 行、破碎行已置顶、组数列参与匹配。
+        //      现默认表改为「只按间距分档」（组数列留 "—"，仅作地质描述），
+        //      因为自动判级已不再把"回次内节理条数"当作组数代入。
         if (config.IntegrityLevelCriteria == null || config.IntegrityLevelCriteria.Count == 0)
         {
             config.IntegrityLevelCriteria = IntegrityCriteriaEngine.GetDefaultCriteria();
             changed = true;
         }
-        else if (IsLegacyDefaultCriteria(config.IntegrityLevelCriteria))
+        else if (IsBuiltinDefaultCriteria(config.IntegrityLevelCriteria))
         {
-            // 旧默认表：将末行（Broken, —, <2）移到表首
-            var rows = config.IntegrityLevelCriteria;
-            var last = rows[rows.Count - 1];
-            rows.RemoveAt(rows.Count - 1);
-            rows.Insert(0, last);
+            config.IntegrityLevelCriteria = IntegrityCriteriaEngine.GetDefaultCriteria();
             changed = true;
         }
 
@@ -114,14 +114,13 @@ public class SpecificationService : ISpecificationService
     }
 
     /// <summary>
-    /// 判断判定表是否为旧版默认表（7 行，破碎行在末尾）。
-    /// 仅当与旧默认表逐行完全一致时返回 true，避免误伤用户自定义表。
+    /// 判断判定表是否仍是某个历史版本的<b>内置默认表</b>（用户从未修改）。
+    /// 仅当逐行完全一致时返回 true，避免误伤用户自定义表。
     /// </summary>
-    private static bool IsLegacyDefaultCriteria(List<IntegrityLevelCriterion> criteria)
+    private static bool IsBuiltinDefaultCriteria(List<IntegrityLevelCriterion> criteria)
     {
-        if (criteria.Count != 7) return false;
-
-        var expected = new (string Level, string J, string S)[]
+        // v1：破碎行在末尾（更早版本）
+        var legacyV1 = new (string Level, string J, string S)[]
         {
             ("Intact",           "1~2", ">95"),
             ("RelativelyIntact", "1~2", "50~95"),
@@ -132,14 +131,33 @@ public class SpecificationService : ISpecificationService
             ("Broken",           "—",   "<2")
         };
 
-        for (int i = 0; i < 7; i++)
+        // v2：破碎行已置顶（上一版）
+        var legacyV2 = new (string Level, string J, string S)[]
+        {
+            ("Broken",           "—",   "<2"),
+            ("Intact",           "1~2", ">95"),
+            ("RelativelyIntact", "1~2", "50~95"),
+            ("RelativelyIntact", "2~3", "30~50"),
+            ("Poor",             "2~3", "10~30"),
+            ("Poor",             "2~3", "≤10"),
+            ("RelativelyBroken", ">3",  "≤10")
+        };
+
+        return MatchesCriteriaTable(criteria, legacyV1) || MatchesCriteriaTable(criteria, legacyV2);
+    }
+
+    private static bool MatchesCriteriaTable(
+        List<IntegrityLevelCriterion> criteria,
+        (string Level, string J, string S)[] expected)
+    {
+        if (criteria.Count != expected.Length) return false;
+
+        for (int i = 0; i < expected.Length; i++)
         {
             var c = criteria[i];
-            if (string.Equals(c.LevelKey, expected[i].Level, StringComparison.OrdinalIgnoreCase)
-                && string.Equals((c.JointSetCount ?? "").Trim(), expected[i].J, StringComparison.OrdinalIgnoreCase)
-                && string.Equals((c.JointSpacing ?? "").Trim(), expected[i].S, StringComparison.OrdinalIgnoreCase))
-                continue;
-            return false;
+            if (!string.Equals(c.LevelKey, expected[i].Level, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals((c.JointSetCount ?? "").Trim(), expected[i].J, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!string.Equals((c.JointSpacing ?? "").Trim(), expected[i].S, StringComparison.OrdinalIgnoreCase)) return false;
         }
         return true;
     }
