@@ -1,6 +1,6 @@
 [package]
 name = "rockcore"
-version = "2.0.0"
+version = "2.0.1"
 description = "RockCore 岩心围岩评价系统"
 edition = "2021"
 rust-version = "1.77.2"

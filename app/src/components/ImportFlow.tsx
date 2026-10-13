@@ -8,7 +8,10 @@ import { AppDialog, Badge, Button } from './ui';
 import { pickExcelFile } from '../lib/dialogs';
 import { useApp } from '../store/app';
 import { depthText, fragText, runNoText, spacingText, statusText, type ImportPreview, type ImportRow } from '../engine/excelImport';
-import { integrityLevelLabel } from '../engine/enums';
+import {
+  RockHardnessLevel, RockStructureType, RockType,
+  integrityLevelLabel, rockHardnessLabel, rockStructureLabel, rockTypeLabel,
+} from '../engine/enums';
 import { isTauri } from '../lib/tauri';
 
 type Trigger = (path?: string) => void;
@@ -30,6 +33,7 @@ export function ImportFlowHost() {
   startDepthRef.current = startDepth;
 
   const boreholeId = useApp((s) => s.boreholeId);
+  const boreholes = useApp((s) => s.boreholes);
   const toast = useApp((s) => s.toast);
 
   async function parse(p: string, depth: number): Promise<ImportPreview> {
@@ -73,6 +77,9 @@ export function ImportFlowHost() {
   const blockedCount = preview?.rows.filter((r) => r.status === 'blocked').length ?? 0;
   const warnCount = preview?.rows.filter((r) => r.status === 'warning').length ?? 0;
   const canImport = preview != null && preview.error == null && blockedCount === 0 && boreholeId != null;
+  const selectedBorehole = boreholes.find((b) => b.id === boreholeId) ?? null;
+  const boreholeMismatch = preview?.boreholeNo != null
+    && selectedBorehole != null && selectedBorehole.number !== preview.boreholeNo;
 
   const visibleRows = preview == null ? [] :
     onlyProblems ? preview.rows.filter((r) => r.status !== 'ok') : preview.rows;
@@ -132,6 +139,15 @@ export function ImportFlowHost() {
               <input type="checkbox" checked={onlyProblems} onChange={(e) => setOnlyProblems(e.target.checked)} />
               只看问题行
             </label>
+            {preview.boreholeNo != null && (
+              <span
+                className={boreholeMismatch ? 'text-[13px] font-medium text-amber-600' : 'text-[13px] text-slate-600'}
+                title={boreholeMismatch ? 'Excel 内填写的钻孔编号与当前选中钻孔不同，数据将写入当前选中钻孔' : '来自 Excel「基本信息」表'}
+              >
+                Excel 钻孔编号：{preview.boreholeNo}
+                {boreholeMismatch && `（当前选中「${selectedBorehole?.number}」，将导入到当前选中钻孔）`}
+              </span>
+            )}
             <span className="text-xs text-slate-400">
               确认导入将替换该钻孔的全部旧数据（回次记录与分段一并重建）
             </span>
@@ -143,7 +159,7 @@ export function ImportFlowHost() {
                   <th>状态</th><th>回次</th><th>深度 (m)</th><th className="rc-num">本段厚(m)</th>
                   <th className="rc-num">回次进尺(m)</th><th className="rc-num">n</th>
                   <th className="rc-num">S(cm)</th><th className="rc-num">RQD(%)</th>
-                  <th>完整性</th><th className="rc-num">碎屑 长/块</th><th className="rc-num">分段</th><th>提示</th>
+                  <th>完整性</th><th>岩质/结构/坚硬</th><th className="rc-num">碎屑 长/块</th><th className="rc-num">分段</th><th>提示</th>
                 </tr>
               </thead>
               <tbody>
@@ -164,6 +180,16 @@ export function ImportFlowHost() {
 
 const statusColor: Record<string, string> = { ok: '#4b9e5f', warning: '#d97706', blocked: '#dc2626' };
 
+/** 选填三列的完整悬停文本 */
+function paramTitle(row: ImportRow): string {
+  const parts = [
+    row.rockType !== RockType.NotSet ? `岩质：${rockTypeLabel[row.rockType]}` : null,
+    row.structureType !== RockStructureType.NotSet ? `结构：${rockStructureLabel[row.structureType]}` : null,
+    row.hardness !== RockHardnessLevel.NotSet ? `坚硬程度：${rockHardnessLabel[row.hardness]}` : null,
+  ].filter((s): s is string => s != null);
+  return parts.length > 0 ? parts.join('　') : '岩质/结构/坚硬程度未填（导入后可在分段编辑补录）';
+}
+
 function PreviewRow({ row }: { row: ImportRow }) {
   return (
     <tr className={row.status === 'warning' ? 'rc-row-warning' : row.status === 'blocked' ? 'rc-row-blocked' : undefined}>
@@ -180,6 +206,13 @@ function PreviewRow({ row }: { row: ImportRow }) {
       <td className="rc-num">{spacingText(row.avgSpacingCm)}</td>
       <td className="rc-num">{row.rqd?.toFixed(2) ?? '—'}</td>
       <td>{row.level !== 0 ? <Badge color="#5b7fae">{integrityLevelLabel[row.level]}</Badge> : '—'}</td>
+      <td className="whitespace-nowrap text-xs" title={paramTitle(row)}>
+        {row.rockType !== RockType.NotSet ? rockTypeLabel[row.rockType] : ''}
+        {row.structureType !== RockStructureType.NotSet && `${row.rockType !== RockType.NotSet ? '·' : ''}${rockStructureLabel[row.structureType]}`}
+        {row.hardness !== RockHardnessLevel.NotSet && `·${rockHardnessLabel[row.hardness]}`}
+        {row.rockType === RockType.NotSet && row.structureType === RockStructureType.NotSet
+          && row.hardness === RockHardnessLevel.NotSet && '—'}
+      </td>
       <td className="rc-num">{fragText(row)}</td>
       <td className="rc-num">{row.segmentNo > 0 ? row.segmentNo : '—'}</td>
       <td className="whitespace-normal text-xs text-slate-500">{row.messages.join('；')}</td>

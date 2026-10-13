@@ -187,3 +187,61 @@ export function parseIntegrityLevelKey(levelKey: string | undefined | null): Int
     default: return IntegrityLevel.Unknown;
   }
 }
+
+// ---------------------------------------------------------------------------
+// 中文标签 → 枚举（Excel 导入用；模板下拉选项与这里必须逐字一致）
+// ---------------------------------------------------------------------------
+
+/** 空文本 → NotSet；无法识别 → null（调用方决定报错方式） */
+function parseByLabel<T extends number>(text: string, map: Record<string, T>, notSet: T): T | null {
+  const s = text.trim();
+  if (s === '') return notSet;
+  return map[s] ?? null;
+}
+
+const rockTypeByLabel: Record<string, RockType> = { 硬质岩: RockType.HardRock, 软质岩: RockType.SoftRock };
+const structureByLabel: Record<string, RockStructureType> = {
+  整体状或巨厚层状结构: RockStructureType.Massive,
+  碎裂结构: RockStructureType.Cataclastic,
+  块状结构: RockStructureType.Blocky,
+  次块状结构: RockStructureType.SubBlocky,
+  厚层状或中厚层状结构: RockStructureType.ThickLayered,
+  互层状结构: RockStructureType.Interbedded,
+  薄层状结构: RockStructureType.ThinLayered,
+  镶嵌结构: RockStructureType.Mosaic,
+  块裂结构: RockStructureType.BlockyFractured,
+  '碎块状或碎屑状结构': RockStructureType.GranularHard,
+  块状或次块状结构: RockStructureType.BlockyOrSubBlocky,
+  '厚层、中厚层或互层状结构': RockStructureType.ThickOrInterbedded,
+  薄层状或块裂结构: RockStructureType.ThinOrBlockyFractured,
+  碎块状或碎屑状散体结构: RockStructureType.GranularSoft,
+};
+const hardnessByLabel: Record<string, RockHardnessLevel> = {
+  坚硬岩: RockHardnessLevel.StrongRock,
+  中硬岩: RockHardnessLevel.MediumHardRock,
+  较软岩: RockHardnessLevel.RelativelySoftRock,
+  软岩: RockHardnessLevel.SoftRock,
+};
+
+export function parseRockTypeLabel(text: string): RockType | null {
+  return parseByLabel(text, rockTypeByLabel, RockType.NotSet);
+}
+export function parseStructureLabel(text: string): RockStructureType | null {
+  return parseByLabel(text, structureByLabel, RockStructureType.NotSet);
+}
+export function parseHardnessLabel(text: string): RockHardnessLevel | null {
+  return parseByLabel(text, hardnessByLabel, RockHardnessLevel.NotSet);
+}
+
+/** 硬质岩专属结构（表 F.0.2 硬质岩半区）；共享项=整体状或巨厚层状结构、碎裂结构 不在其中 */
+export const hardRockOnlyStructures: ReadonlySet<RockStructureType> = new Set([
+  RockStructureType.Blocky, RockStructureType.SubBlocky, RockStructureType.ThickLayered,
+  RockStructureType.Interbedded, RockStructureType.ThinLayered, RockStructureType.Mosaic,
+  RockStructureType.BlockyFractured, RockStructureType.GranularHard,
+]);
+
+/** 软质岩专属结构（表 F.0.2 软质岩半区） */
+export const softRockOnlyStructures: ReadonlySet<RockStructureType> = new Set([
+  RockStructureType.BlockyOrSubBlocky, RockStructureType.ThickOrInterbedded,
+  RockStructureType.ThinOrBlockyFractured, RockStructureType.GranularSoft,
+]);
