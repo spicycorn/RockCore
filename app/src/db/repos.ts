@@ -151,6 +151,7 @@ export async function updateProject(db: Sql, id: number, p: ProjectInput): Promi
 export async function deleteProject(db: Sql, id: number): Promise<void> {
   // 显式级联（不依赖 PRAGMA foreign_keys 在连接池下的表现）
   await db.transaction([
+    { query: 'DELETE FROM attachments WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
     { query: 'DELETE FROM segments WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
     { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1))', values: [id] },
     { query: 'DELETE FROM import_batches WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
@@ -198,6 +199,7 @@ export async function updateBorehole(db: Sql, id: number, b: BoreholeInput): Pro
 
 export async function deleteBorehole(db: Sql, id: number): Promise<void> {
   await db.transaction([
+    { query: 'DELETE FROM attachments WHERE borehole_id = ?1', values: [id] },
     { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [id] },
     { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [id] },
     { query: 'DELETE FROM import_batches WHERE borehole_id = ?1', values: [id] },
@@ -254,10 +256,12 @@ export async function saveImport(
   for (const s of segments) {
     ops.push({
       query: `INSERT INTO segments (borehole_id, batch_id, seq, depth_start, depth_end, thickness_m,
-          run_count, total_pieces, spacing_cm, rqd, integrity_level, updated_at)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+          run_count, total_pieces, spacing_cm, rqd, integrity_level,
+          rock_type, structure_type, hardness, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
       values: [boreholeId, batchId, s.no, s.depthStart, s.depthEnd, s.thicknessM,
-        s.runCount, s.totalPieces, s.spacingCm, s.rqd, s.level, new Date().toISOString()],
+        s.runCount, s.totalPieces, s.spacingCm, s.rqd, s.level,
+        s.rockType, s.structureType, s.hardness, new Date().toISOString()],
     });
   }
   if (ops.length > 0) await db.transaction(ops);
@@ -320,6 +324,53 @@ export async function saveSegmentClassifications(
       w.rockClass, w.basis, now, w.id,
     ],
   })));
+}
+
+// ---------------------------------------------------------------------------
+// 钻孔附件（岩心照片等）：base64 内嵌存储，只做预览查看，不与数据行绑定
+// ---------------------------------------------------------------------------
+
+/** 附件列表行（不含 data_b64，避免整表加载大字段） */
+export interface AttachmentRow {
+  id: number;
+  borehole_id: number;
+  file_name: string;
+  mime: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+export interface AttachmentFullRow extends AttachmentRow {
+  data_b64: string;
+}
+
+export async function listAttachments(db: Sql, boreholeId: number): Promise<AttachmentRow[]> {
+  return db.select<AttachmentRow>(
+    `SELECT id, borehole_id, file_name, mime, size_bytes, created_at
+       FROM attachments WHERE borehole_id = ?1 ORDER BY id`,
+    [boreholeId],
+  );
+}
+
+export async function getAttachment(db: Sql, id: number): Promise<AttachmentFullRow | null> {
+  const rows = await db.select<AttachmentFullRow>('SELECT * FROM attachments WHERE id = ?1', [id]);
+  return rows.length > 0 ? rows[0] : null;
+}
+
+export async function addAttachment(
+  db: Sql,
+  boreholeId: number,
+  a: { fileName: string; mime: string; sizeBytes: number; dataB64: string },
+): Promise<void> {
+  await db.execute(
+    `INSERT INTO attachments (borehole_id, file_name, mime, size_bytes, data_b64, created_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, datetime('now','localtime'))`,
+    [boreholeId, a.fileName, a.mime, a.sizeBytes, a.dataB64],
+  );
+}
+
+export async function deleteAttachment(db: Sql, id: number): Promise<void> {
+  await db.execute('DELETE FROM attachments WHERE id = ?1', [id]);
 }
 
 // ---------------------------------------------------------------------------

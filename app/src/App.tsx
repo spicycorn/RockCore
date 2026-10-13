@@ -91,7 +91,7 @@ export default function App() {
     showContextMenu(rect.left, rect.bottom, [
       {
         label: '使用说明',
-        action: () => toast('info', '流程：新建项目 → 新建钻孔 → 导入 v10 模板 Excel → 分段编辑里补齐围岩参数 → 查看柱状图与统计。任何操作都有右键/菜单/快捷键入口。'),
+        action: () => toast('info', '流程：新建项目 → 新建钻孔 → 导入 v12 模板 Excel → 分段编辑里补齐围岩参数 → 查看柱状图与统计。任何操作都有右键/菜单/快捷键入口。'),
       },
       { label: '关于 RockCore', action: () => toast('info', 'RockCore 2.0 — 岩心回次自动分析：RQD · 完整性（表 F.0.4）· 围岩分类（表 F.0.2）') },
     ]);
@@ -140,7 +140,7 @@ export default function App() {
       <footer className="h-6 shrink-0 flex items-center gap-4 px-3 bg-surface border-t border-line text-[11px] text-slate-500">
         <span>{borehole != null ? `钻孔 ${borehole.number}` : '未选择钻孔'}</span>
         <span>{busy ?? ''}</span>
-        <span className="ml-auto">模板 v10 · 判据 表F.0.4 / 表F.0.2</span>
+        <span className="ml-auto">模板 v12 · 判据 表F.0.4 / 表F.0.2</span>
       </footer>
 
       <ContextMenuHost />

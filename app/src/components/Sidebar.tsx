@@ -6,6 +6,7 @@ import { useState } from 'react';
 import clsx from 'clsx';
 import { Button, showContextMenu } from './ui';
 import { BoreholeDialog, ProjectDialog } from './EntityDialogs';
+import { AttachmentDialog } from './AttachmentDialog';
 import { startImport } from './ImportFlow';
 import { useApp } from '../store/app';
 import type { BoreholeRow, ProjectRow } from '../db/repos';
@@ -24,6 +25,7 @@ export function Sidebar() {
 
   const [projectDialog, setProjectDialog] = useState<{ open: boolean; target: ProjectRow | null }>({ open: false, target: null });
   const [boreholeDialog, setBoreholeDialog] = useState<{ open: boolean; target: BoreholeRow | null }>({ open: false, target: null });
+  const [attachmentDialog, setAttachmentDialog] = useState<{ open: boolean; target: BoreholeRow | null }>({ open: false, target: null });
 
   const confirmDelete = (what: string, detail: string, onYes: () => void) => {
     // 原生 confirm 在 WebView2 可用且足够醒目；破坏性操作二次确认
@@ -48,6 +50,7 @@ export function Sidebar() {
     showContextMenu(e.clientX, e.clientY, [
       { label: '导入 Excel 数据…', hint: 'Ctrl+I', action: () => { void selectBorehole(b.id).then(() => startImport()); } },
       { label: '编辑孔属性', action: () => setBoreholeDialog({ open: true, target: b }) },
+      { label: '附件（岩心照片等）…', action: () => setAttachmentDialog({ open: true, target: b }) },
       { sep: true },
       { label: '查看回次明细', action: () => { void selectBorehole(b.id).then(() => setTab('runs')); } },
       { label: '分段与围岩分类', action: () => { void selectBorehole(b.id).then(() => setTab('segments')); } },
@@ -132,6 +135,7 @@ export function Sidebar() {
 
       <ProjectDialog open={projectDialog.open} target={projectDialog.target} onClose={() => setProjectDialog({ open: false, target: null })} />
       <BoreholeDialog open={boreholeDialog.open} target={boreholeDialog.target} onClose={() => setBoreholeDialog({ open: false, target: null })} />
+      <AttachmentDialog open={attachmentDialog.open} borehole={attachmentDialog.target} onClose={() => setAttachmentDialog({ open: false, target: null })} />
     </aside>
   );
 }

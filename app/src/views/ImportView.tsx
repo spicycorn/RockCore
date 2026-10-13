@@ -2,8 +2,10 @@
  * 导入页：当前钻孔的导入入口（按钮 / 拖拽 / 右键都汇聚到同一流程）与批次信息。
  */
 
+import { useState } from 'react';
 import { Button, EmptyState } from '../components/ui';
 import { startImport } from '../components/ImportFlow';
+import { AttachmentDialog } from '../components/AttachmentDialog';
 import { useApp } from '../store/app';
 import { saveFileAs } from '../lib/dialogs';
 import { bundledTemplate, writeFileBytes } from '../lib/tauri';
@@ -15,6 +17,7 @@ export function ImportView() {
   const runStats = useApp((s) => s.runStats);
   const setTab = useApp((s) => s.setTab);
   const toast = useApp((s) => s.toast);
+  const [attachOpen, setAttachOpen] = useState(false);
 
   if (borehole == null) {
     return (
@@ -43,15 +46,18 @@ export function ImportView() {
             导入钻孔 {borehole.number} 的回次数据
           </div>
           <p className="text-xs text-slate-500 leading-5 mb-4">
-            使用 v10 模板填写：「回次表」记 回次号/进尺(m)，「岩心表」一段一行记 回次号/类型/长度(m)/块数。
+            使用 v12 模板填写（一行一回次）：「基本信息」填钻孔编号；「岩心记录」填 回次号/进尺(m) 与 岩心段1..20——按由浅到深一段一格：整段只填长度（≥0.1m），不足10厘米破碎带填 长度,块数（如 0.08,3），RQD 列自动计算；行尾选填 岩质/结构类型/坚硬程度。第 2 行黄底是填写提示，数据从第 3 行起。
             软件会校验闭合、重算 RQD 与平均间距、按表 F.0.4 判完整性、归并完整性分段，并在下一步引导录入围岩分类参数。
           </p>
           <div className="flex items-center gap-2">
             <Button variant="primary" className="h-9 px-4 text-sm" title="Ctrl+I" onClick={() => startImport()}>
               选择 Excel 文件导入…
             </Button>
-            <Button className="h-9 px-3" onClick={() => void downloadTemplate()} title="保存随安装包发布的 v10 空白模板">
+            <Button className="h-9 px-3" onClick={() => void downloadTemplate()} title="保存随安装包发布的 v12 空白模板">
               下载导入模板
+            </Button>
+            <Button className="h-9 px-3" onClick={() => setAttachOpen(true)} title="为当前钻孔附加岩心照片等文件（保存在本机数据库，可预览）">
+              附件…
             </Button>
             <span className="text-xs text-slate-400 ml-2">也可以把 .xlsx 直接拖进窗口</span>
           </div>
@@ -81,6 +87,7 @@ export function ImportView() {
           </div>
         )}
       </div>
+      <AttachmentDialog open={attachOpen} borehole={borehole} onClose={() => setAttachOpen(false)} />
     </div>
   );
 }

@@ -12,6 +12,17 @@ export function pickExcelFile(): Promise<string | null> {
   });
 }
 
+/** 选择要附加到钻孔的文件（岩心照片等），返回路径或 null */
+export function pickAttachmentFile(): Promise<string | null> {
+  return open({
+    multiple: false,
+    filters: [{
+      name: '岩心照片 / 附件',
+      extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'pdf'],
+    }],
+  });
+}
+
 /** 另存为对话框，返回路径或 null */
 export function saveFileAs(defaultName: string, extensions: string[]): Promise<string | null> {
   return save({

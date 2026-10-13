@@ -4,7 +4,7 @@
  */
 
 /** 当前模式版本；后续结构变更时递增并补 migrate() 分支 */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const SCHEMA_DDL = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -87,6 +87,18 @@ CREATE INDEX IF NOT EXISTS idx_boreholes_project ON boreholes(project_id);
 CREATE INDEX IF NOT EXISTS idx_batches_borehole  ON import_batches(borehole_id);
 CREATE INDEX IF NOT EXISTS idx_runstats_batch    ON run_stats(batch_id);
 CREATE INDEX IF NOT EXISTS idx_segments_borehole ON segments(borehole_id);
+
+-- 钻孔附件（岩心照片等）：base64 内嵌存储，只做预览查看，不与数据行绑定
+CREATE TABLE IF NOT EXISTS attachments (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  borehole_id  INTEGER NOT NULL REFERENCES boreholes(id) ON DELETE CASCADE,
+  file_name    TEXT NOT NULL,
+  mime         TEXT NOT NULL,
+  size_bytes   INTEGER NOT NULL,
+  data_b64     TEXT NOT NULL,
+  created_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_borehole ON attachments(borehole_id);
 
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
