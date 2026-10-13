@@ -1,0 +1,58 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Microsoft YaHei UI', 'Microsoft YaHei', 'Segoe UI', system-ui, sans-serif;
+
+  /* 浅色工程风：钢蓝主色（与围岩 Ⅰ 类钢蓝同源），中性灰阶 */
+  --color-primary-50: #eef4fa;
+  --color-primary-100: #d8e6f3;
+  --color-primary-200: #b3cde5;
+  --color-primary-300: #7fadd1;
+  --color-primary-400: #4a88b8;
+  --color-primary-500: #2f5b8f;
+  --color-primary-600: #274d79;
+  --color-primary-700: #1f3e61;
+  --color-primary-800: #182f4a;
+  --color-primary-900: #122336;
+
+  --color-surface: #ffffff;
+  --color-surface-alt: #f5f7fa;
+  --color-line: #dde4ec;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  @apply bg-surface-alt text-slate-800 text-sm antialiased select-none;
+}
+
+input, textarea, select {
+  user-select: text;
+}
+
+/* 细滚动条，贴近工程软件 */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { @apply bg-slate-300 rounded; border: 2px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-thumb:hover { @apply bg-slate-400; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* 表格通用 */
+.rc-table { @apply w-full border-collapse; }
+.rc-table th {
+  @apply sticky top-0 z-10 bg-surface-alt text-slate-600 font-medium text-left
+         border-b border-line px-2 py-1.5 whitespace-nowrap select-none;
+}
+.rc-table td { @apply border-b border-line/60 px-2 py-1 whitespace-nowrap; }
+.rc-table tr:hover td { @apply bg-primary-50/60; }
+.rc-table tr.rc-row-warning td { @apply bg-amber-50; }
+.rc-table tr.rc-row-blocked td { @apply bg-red-50; }
+.rc-table tr.rc-row-selected td { @apply bg-primary-100/80; }
+
+/* 数字单元格右对齐 */
+.rc-num { @apply text-right tabular-nums; }
+
+/* 焦点可见性（键盘操作） */
+:focus-visible { @apply outline-2 outline-offset-1 outline-primary-400; }

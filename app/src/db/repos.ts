@@ -1,0 +1,339 @@
+/**
+ * 数据访问层：全部 SQL 集中在这里，UI 不写 SQL。
+ * 只依赖最小 Sql 接口（@tauri-apps/plugin-sql 的 Database 天然满足），
+ * 便于将来在测试里注入替身。
+ */
+
+import type { ImportRow, ImportSegment } from '../engine/excelImport';
+import {
+  GroundwaterCondition,
+  IntegrityLevel,
+  RockClass,
+  RockHardnessLevel,
+  RockHomogeneity,
+  RockStructureType,
+  RockType,
+} from '../engine/enums';
+
+export interface Sql {
+  execute(sql: string, bind?: unknown[]): Promise<unknown>;
+  select<T>(sql: string, bind?: unknown[]): Promise<T[]>;
+  transaction(ops: { query: string; values?: unknown[] }[]): Promise<unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// 行类型（与 schema.ts 列一一对应）
+// ---------------------------------------------------------------------------
+
+export interface ProjectRow {
+  id: number;
+  project_number: string;
+  name: string;
+  phase: string;
+  cave_axis_azimuth: number | null;
+  created_at: string;
+}
+
+export interface BoreholeRow {
+  id: number;
+  project_id: number;
+  number: string;
+  orifice_elevation: number | null;
+  total_depth: number | null;
+  groundwater_depth: number | null;
+  azimuth: number | null;
+  inclination_angle: number | null;
+  orifice_x: number | null;
+  orifice_y: number | null;
+  orifice_z: number | null;
+}
+
+export interface BatchRow {
+  id: number;
+  borehole_id: number;
+  file_name: string;
+  imported_at: string;
+  start_depth: number;
+  run_count: number;
+}
+
+export interface RunStatRow {
+  id: number;
+  batch_id: number;
+  run_no: number;
+  part_index: number;
+  part_total: number;
+  depth_start: number;
+  depth_end: number;
+  run_length_m: number;
+  run_total_length_m: number;
+  frag_count: number | null;
+  frag_length_cm: number | null;
+  pieces: string;
+  total_pieces: number;
+  joint_count: number;
+  rqd: number;
+  avg_spacing_cm: number;
+}
+
+export interface SegmentRow {
+  id: number;
+  borehole_id: number;
+  batch_id: number;
+  seq: number;
+  depth_start: number;
+  depth_end: number;
+  thickness_m: number;
+  run_count: number;
+  total_pieces: number;
+  spacing_cm: number;
+  rqd: number;
+  integrity_level: number;
+  integrity_override: number | null;
+  rock_type: number;
+  structure_type: number;
+  hardness: number;
+  homogeneity: number;
+  groundwater: number;
+  cave_angle_lt30: number | null;
+  rock_class: number | null;
+  basis: string | null;
+  updated_at: string;
+}
+
+/** 段的最终完整性等级：用户覆盖优先于自动判级 */
+export function finalIntegrityLevel(row: SegmentRow): IntegrityLevel {
+  return (row.integrity_override ?? row.integrity_level) as IntegrityLevel;
+}
+
+/** 段的 F.0.2 参数（编辑器/分类共用） */
+export function segmentF02(row: SegmentRow) {
+  return {
+    rockType: row.rock_type as RockType,
+    structureType: row.structure_type as RockStructureType,
+    hardnessLevel: row.hardness as RockHardnessLevel,
+    homogeneity: row.homogeneity as RockHomogeneity,
+    groundwater: row.groundwater as GroundwaterCondition,
+    caveAxisAngleLessThan30: row.cave_angle_lt30 == null ? null : row.cave_angle_lt30 === 1,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 项目 / 钻孔
+// ---------------------------------------------------------------------------
+
+export interface ProjectInput {
+  project_number: string;
+  name: string;
+  phase: string;
+  cave_axis_azimuth: number | null;
+}
+
+export async function listProjects(db: Sql): Promise<ProjectRow[]> {
+  return db.select<ProjectRow>('SELECT * FROM projects ORDER BY id DESC');
+}
+
+export async function createProject(db: Sql, p: ProjectInput): Promise<number> {
+  const res = await db.execute(
+    'INSERT INTO projects (project_number, name, phase, cave_axis_azimuth, created_at) VALUES (?1, ?2, ?3, ?4, ?5)',
+    [p.project_number, p.name, p.phase, p.cave_axis_azimuth, new Date().toISOString()],
+  );
+  return Number(res);
+}
+
+export async function updateProject(db: Sql, id: number, p: ProjectInput): Promise<void> {
+  await db.execute(
+    'UPDATE projects SET project_number = ?1, name = ?2, phase = ?3, cave_axis_azimuth = ?4 WHERE id = ?5',
+    [p.project_number, p.name, p.phase, p.cave_axis_azimuth, id],
+  );
+}
+
+export async function deleteProject(db: Sql, id: number): Promise<void> {
+  // 显式级联（不依赖 PRAGMA foreign_keys 在连接池下的表现）
+  await db.transaction([
+    { query: 'DELETE FROM segments WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
+    { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1))', values: [id] },
+    { query: 'DELETE FROM import_batches WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
+    { query: 'DELETE FROM boreholes WHERE project_id = ?1', values: [id] },
+    { query: 'DELETE FROM projects WHERE id = ?1', values: [id] },
+  ]);
+}
+
+export interface BoreholeInput {
+  number: string;
+  orifice_elevation: number | null;
+  total_depth: number | null;
+  groundwater_depth: number | null;
+  azimuth: number | null;
+  inclination_angle: number | null;
+  orifice_x: number | null;
+  orifice_y: number | null;
+  orifice_z: number | null;
+}
+
+export async function listBoreholes(db: Sql, projectId: number): Promise<BoreholeRow[]> {
+  return db.select<BoreholeRow>('SELECT * FROM boreholes WHERE project_id = ?1 ORDER BY number', [projectId]);
+}
+
+export async function createBorehole(db: Sql, projectId: number, b: BoreholeInput): Promise<number> {
+  const res = await db.execute(
+    `INSERT INTO boreholes (project_id, number, orifice_elevation, total_depth, groundwater_depth,
+       azimuth, inclination_angle, orifice_x, orifice_y, orifice_z)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
+    [projectId, b.number, b.orifice_elevation, b.total_depth, b.groundwater_depth,
+      b.azimuth, b.inclination_angle, b.orifice_x, b.orifice_y, b.orifice_z],
+  );
+  return Number(res);
+}
+
+export async function updateBorehole(db: Sql, id: number, b: BoreholeInput): Promise<void> {
+  await db.execute(
+    `UPDATE boreholes SET number = ?1, orifice_elevation = ?2, total_depth = ?3, groundwater_depth = ?4,
+       azimuth = ?5, inclination_angle = ?6, orifice_x = ?7, orifice_y = ?8, orifice_z = ?9
+     WHERE id = ?10`,
+    [b.number, b.orifice_elevation, b.total_depth, b.groundwater_depth,
+      b.azimuth, b.inclination_angle, b.orifice_x, b.orifice_y, b.orifice_z, id],
+  );
+}
+
+export async function deleteBorehole(db: Sql, id: number): Promise<void> {
+  await db.transaction([
+    { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [id] },
+    { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [id] },
+    { query: 'DELETE FROM import_batches WHERE borehole_id = ?1', values: [id] },
+    { query: 'DELETE FROM boreholes WHERE id = ?1', values: [id] },
+  ]);
+}
+
+// ---------------------------------------------------------------------------
+// 导入落库（同钻孔旧批次整体替换，对齐 1.x 语义）
+// ---------------------------------------------------------------------------
+
+export interface ImportBatchInput {
+  fileName: string;
+  startDepth: number;
+  runCount: number;
+}
+
+/**
+ * 导入落库：同钻孔旧批次整体替换（对齐 1.x 语义）。
+ * 批次插入单独一步取回 last_insert_rowid，明细在事务里批量写。
+ */
+export async function saveImport(
+  db: Sql,
+  boreholeId: number,
+  batch: ImportBatchInput,
+  rows: readonly ImportRow[],
+  segments: readonly ImportSegment[],
+): Promise<number> {
+  await db.transaction([
+    { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [boreholeId] },
+    { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [boreholeId] },
+    { query: 'DELETE FROM import_batches WHERE borehole_id = ?1', values: [boreholeId] },
+  ]);
+  const batchRes = await db.execute(
+    `INSERT INTO import_batches (borehole_id, file_name, imported_at, start_depth, run_count)
+     VALUES (?1, ?2, ?3, ?4, ?5)`,
+    [boreholeId, batch.fileName, new Date().toISOString(), batch.startDepth, batch.runCount],
+  );
+  const batchId = Number(batchRes);
+
+  const ops: { query: string; values?: unknown[] }[] = [];
+  for (const r of rows) {
+    if (r.runNo == null || (r.runLengthM ?? 0) <= 0) continue; // 阻断/空行不入库
+    ops.push({
+      query: `INSERT INTO run_stats (batch_id, run_no, part_index, part_total, depth_start, depth_end,
+          run_length_m, run_total_length_m, frag_count, frag_length_cm, pieces,
+          total_pieces, joint_count, rqd, avg_spacing_cm)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+      values: [batchId, r.runNo, r.runPartIndex, r.runRowCount, r.depthStart, r.depthEnd,
+        r.runLengthM, r.runTotalLengthM, r.fragCount, r.fragLengthCm, JSON.stringify(r.pieces),
+        r.totalPieces, r.jointCount, r.rqd, r.avgSpacingCm],
+    });
+  }
+  for (const s of segments) {
+    ops.push({
+      query: `INSERT INTO segments (borehole_id, batch_id, seq, depth_start, depth_end, thickness_m,
+          run_count, total_pieces, spacing_cm, rqd, integrity_level, updated_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+      values: [boreholeId, batchId, s.no, s.depthStart, s.depthEnd, s.thicknessM,
+        s.runCount, s.totalPieces, s.spacingCm, s.rqd, s.level, new Date().toISOString()],
+    });
+  }
+  if (ops.length > 0) await db.transaction(ops);
+  return batchId;
+}
+
+// ---------------------------------------------------------------------------
+// 查询 / 编辑
+// ---------------------------------------------------------------------------
+
+export async function listBatches(db: Sql, boreholeId: number): Promise<BatchRow[]> {
+  return db.select<BatchRow>('SELECT * FROM import_batches WHERE borehole_id = ?1 ORDER BY id DESC', [boreholeId]);
+}
+
+export async function listRunStats(db: Sql, boreholeId: number): Promise<RunStatRow[]> {
+  return db.select<RunStatRow>(
+    `SELECT rs.* FROM run_stats rs
+     JOIN import_batches b ON b.id = rs.batch_id
+     WHERE b.borehole_id = ?1
+     ORDER BY rs.depth_start, rs.part_index`,
+    [boreholeId],
+  );
+}
+
+export async function listSegments(db: Sql, boreholeId: number): Promise<SegmentRow[]> {
+  return db.select<SegmentRow>(
+    'SELECT * FROM segments WHERE borehole_id = ?1 ORDER BY depth_start',
+    [boreholeId],
+  );
+}
+
+/** 段 F.0.2 参数 + 覆盖等级 + 分类结果的整体回写（分类在内存重算后落库） */
+export interface SegmentClassificationWrite {
+  id: number;
+  integrityOverride: IntegrityLevel | null;
+  rockType: RockType;
+  structureType: RockStructureType;
+  hardness: RockHardnessLevel;
+  homogeneity: RockHomogeneity;
+  groundwater: GroundwaterCondition;
+  caveAngleLt30: boolean | null;
+  rockClass: RockClass | null;
+  basis: string | null;
+}
+
+export async function saveSegmentClassifications(
+  db: Sql,
+  writes: readonly SegmentClassificationWrite[],
+): Promise<void> {
+  if (writes.length === 0) return;
+  const now = new Date().toISOString();
+  await db.transaction(writes.map((w) => ({
+    query: `UPDATE segments SET integrity_override = ?1, rock_type = ?2, structure_type = ?3,
+        hardness = ?4, homogeneity = ?5, groundwater = ?6, cave_angle_lt30 = ?7,
+        rock_class = ?8, basis = ?9, updated_at = ?10
+      WHERE id = ?11`,
+    values: [
+      w.integrityOverride, w.rockType, w.structureType, w.hardness, w.homogeneity,
+      w.groundwater, w.caveAngleLt30 == null ? null : w.caveAngleLt30 ? 1 : 0,
+      w.rockClass, w.basis, now, w.id,
+    ],
+  })));
+}
+
+// ---------------------------------------------------------------------------
+// 设置（JSON 值，键固定）
+// ---------------------------------------------------------------------------
+
+export async function getSetting(db: Sql, key: string): Promise<string | null> {
+  const rows = await db.select<{ value: string }>('SELECT value FROM settings WHERE key = ?1', [key]);
+  return rows.length > 0 ? rows[0].value : null;
+}
+
+export async function setSetting(db: Sql, key: string, value: string): Promise<void> {
+  await db.execute(
+    'INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    [key, value],
+  );
+}

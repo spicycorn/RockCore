@@ -1,0 +1,39 @@
+# RockCore .gitattributes
+# 统一换行符 + 标注二进制文件，避免跨平台污染与无意义 diff
+
+# ---- 文本文件：仓库内统一 LF ----
+* text=auto
+*.md        text
+*.json      text
+*.yml       text
+*.yaml      text
+*.txt       text
+*.ts        text
+*.tsx       text
+*.mjs       text
+*.css       text
+*.html      text
+*.rs        text
+*.toml      text
+*.conf      text
+.gitignore  text
+.gitattributes text
+LICENSE     text
+
+# ---- 二进制文件：不做换行转换 ----
+# xlsx 是「导入模板」交付物（嵌入安装包），换行转换会直接损坏文件
+*.xlsx    binary
+*.ico     binary
+*.icns    binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.woff    binary
+*.woff2   binary
+*.ttf     binary
+*.db      binary
+*.sqlite  binary
+
+# ---- 文档中的规范参考图（保持二进制，不做 diff）----
+docs/*.png binary
