@@ -23,6 +23,10 @@ export interface RockMassRunInput {
   totalPieces: number;
   /** ≥10cm 岩心段累计长度（cm） */
   totalLengthCm: number;
+  /** 碎屑块数（「长度,块数」记录的块数之和）；0 = 无碎屑 */
+  fragCount?: number;
+  /** 碎屑累计长度（cm） */
+  fragLengthCm?: number;
   /** F.0.2 岩质键值（RockType 编码）；0 或负数表示未填（未填时不作为强制分界） */
   rockTypeKey: number;
 }
@@ -46,6 +50,10 @@ export class RockMassSegment {
   totalPieces = 0;
   /** 段内 ≥10cm 岩心累计长度之和（cm） */
   totalLengthCm = 0;
+  /** 段内碎屑块数之和 */
+  fragCount = 0;
+  /** 段内碎屑累计长度（cm） */
+  fragLengthCm = 0;
 
   /** 回次数 */
   get runCount(): number {
@@ -71,6 +79,11 @@ export class RockMassSegment {
     return this.thicknessM > 0 ? round((this.totalLengthCm / (this.thicknessM * 100)) * 100, 2) : 0;
   }
 
+  /** 段的碎屑平均块径（cm）= Σ碎屑长 ÷ Σ碎屑块数；无碎屑 → NaN */
+  get fragMeanSizeCm(): number {
+    return this.fragCount > 0 ? round(this.fragLengthCm / this.fragCount, 2) : Number.NaN;
+  }
+
   /** 组内回次的岩质键值（取第一个已填的；都没填返回 0） */
   get rockTypeKey(): number {
     return this.runs.find((r) => r.rockTypeKey > 0)?.rockTypeKey ?? 0;
@@ -92,6 +105,8 @@ export class RockMassSegment {
     this.thicknessM = round(this.runs.reduce((s, r) => s + (r.depthEnd - r.depthStart), 0), 4);
     this.totalPieces = this.runs.reduce((s, r) => s + r.totalPieces, 0);
     this.totalLengthCm = round(this.runs.reduce((s, r) => s + r.totalLengthCm, 0), 2);
+    this.fragCount = this.runs.reduce((s, r) => s + (r.fragCount ?? 0), 0);
+    this.fragLengthCm = round(this.runs.reduce((s, r) => s + (r.fragLengthCm ?? 0), 0), 2);
   }
 }
 

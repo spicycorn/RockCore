@@ -231,3 +231,39 @@ function classifySoftRock(
     '岩体结构类型/完整性等级',
   );
 }
+
+// ---------------------------------------------------------------------------
+// 表 F.0.2 展示数据（规范设置页只读展示；判定逻辑在上方 classify，两者同源）
+// ---------------------------------------------------------------------------
+
+export interface F02RuleRow {
+  no: number;
+  /** 岩质 */
+  rock: string;
+  /** 岩体结构类型 */
+  structure: string;
+  /** 完整程度 */
+  integrity: string;
+  /** 围岩类别（含条件分支，与 classify 判定一致） */
+  result: string;
+}
+
+/** DL/T 5894-2025 表 F.0.2「围岩初步分类」16 条规则（与 classify 分支一一对应） */
+export const F02_RULES: readonly F02RuleRow[] = [
+  { no: 1, rock: '硬质岩', structure: '整体状或巨厚层状结构', integrity: '完整', result: '坚硬岩 → Ⅰ类；中硬岩 → Ⅱ类' },
+  { no: 2, rock: '硬质岩', structure: '块状结构', integrity: '较完整', result: '坚硬岩 → Ⅱ类；中硬岩 → Ⅲ类' },
+  { no: 3, rock: '硬质岩', structure: '次块状结构', integrity: '较完整', result: '坚硬岩 → Ⅱ类；中硬岩 → Ⅲ类' },
+  { no: 4, rock: '硬质岩', structure: '厚层状或中厚层状结构', integrity: '较完整', result: '坚硬岩 → Ⅱ类；中硬岩 → Ⅲ类' },
+  { no: 5, rock: '硬质岩', structure: '互层状结构', integrity: '较完整', result: '洞轴线与岩层走向夹角 ≥30° → Ⅲ类；<30° → Ⅳ类' },
+  { no: 6, rock: '硬质岩', structure: '薄层状结构', integrity: '完整性差', result: '岩质均一、无软弱夹层 → Ⅲ类；有软弱夹层 → Ⅳ类' },
+  { no: 7, rock: '硬质岩', structure: '镶嵌结构', integrity: '完整性差', result: 'Ⅲ类' },
+  { no: 8, rock: '硬质岩', structure: '块裂结构', integrity: '完整性差', result: 'Ⅳ类' },
+  { no: 9, rock: '硬质岩', structure: '碎裂结构', integrity: '较破碎', result: '无地下水 → Ⅳ类；有地下水 → Ⅴ类' },
+  { no: 10, rock: '硬质岩', structure: '碎块状或碎屑状结构', integrity: '破碎', result: 'Ⅴ类' },
+  { no: 11, rock: '软质岩', structure: '整体状或巨厚层状结构', integrity: '完整', result: '较软岩：无地下水 → Ⅲ类、有地下水 → Ⅳ类；软岩 → Ⅳ类' },
+  { no: 12, rock: '软质岩', structure: '块状或次块状结构', integrity: '较完整', result: '无地下水 → Ⅳ类；有地下水 → Ⅴ类' },
+  { no: 13, rock: '软质岩', structure: '厚层状、中厚层状或互层状结构', integrity: '较完整', result: '无地下水 → Ⅳ类；有地下水 → Ⅴ类' },
+  { no: 14, rock: '软质岩', structure: '薄层状或块裂结构', integrity: '完整性差', result: '较软岩且无地下水 → Ⅳ类；其余 → Ⅴ类' },
+  { no: 15, rock: '软质岩', structure: '碎裂结构', integrity: '较破碎', result: '较软岩且无地下水 → Ⅳ类；其余 → Ⅴ类' },
+  { no: 16, rock: '软质岩', structure: '碎块状或碎屑状散体结构', integrity: '破碎', result: 'Ⅴ类' },
+];

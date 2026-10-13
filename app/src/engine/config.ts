@@ -20,11 +20,13 @@ export interface IntegrityLevelCriterion {
   /** 完整性等级键名，如 Intact / RelativelyIntact / Poor / RelativelyBroken / Broken */
   levelKey: string;
   /**
-   * 结构面发育组数，如 "1~2"。地质描述字段：自动判级**不**使用它
-   * （回次取芯算不出节理组数），仅在规范设置中供人工记录。
+   * 结构面发育组数，如 "1~2"、">3"、"无序"。
+   * 自动判级使用「估算组数」参与匹配（见 integrity.estimateJointSets：
+   * 间距 >50cm→2 组；10~50cm→3 组；≤10cm 按碎屑平均块径分 3 或 4(>3) 组；"无序" 永不自动命中）。
+   * 人工地质描述场景可直接给出真实组数走 tryMatch。
    */
   jointSetCount: string;
-  /** 结构面间距（cm），如 ">95"。自动判级的唯一依据。 */
+  /** 结构面间距（cm），如 ">100"。自动判级的间距条件。"—"（无判据）的行不参与自动判级。 */
   jointSpacing: string;
   /** 结构面发育程度，如 "不发育"。地质描述字段，不参与判级。 */
   jointDevelopment: string;
@@ -46,6 +48,13 @@ export interface SpecThresholds {
   rockSegmentMinThicknessM: number;
   /** 归并容差：平均间距相对差超过该比例时另起一段（默认 0.5，即 50%）。 */
   rockSegmentSpacingToleranceRatio: number;
+  /**
+   * 组数估算阈值（cm，默认 3.3）：平均间距 ≤10cm 时，碎屑平均块径（碎屑长÷碎屑块数）
+   * 低于该值判为多组交叉切割（>3 组 → 较破碎），否则按 2~3 组（完整性差）。
+   * 3.3 ≈ 10cm÷3 组——3 组结构面在 10cm 内均匀切割的块径。对应规范表 F.0.4 中
+   * "<10cm" 两列（完整性差·发育 / 较破碎·很发育）在回次数据下的区分信号。
+   */
+  fragMeanSizeThresholdCm: number;
 }
 
 export interface RockSpecificationConfig {
@@ -61,8 +70,31 @@ export interface RockSpecificationConfig {
   integrityLevelCriteria: IntegrityLevelCriterion[];
 }
 
-/** 内置默认判定表（表 F.0.4）。行序 = 优先级：破碎行置顶，保持"间距<2cm → 破碎"最高优先级。 */
+/**
+ * 内置默认判定表（表 F.0.4，DL/T 5894-2025 附录 F）。行序 = 优先级，首次匹配即返回。
+ *
+ * 与规范表逐列对应：组数 / 间距 / 发育程度。两处工程化收口（均已在设置页可见）：
+ *  · 规范两个 "<10" 列写作 "≤10"，闭合 S=10 的边界缝隙；
+ *  · 破碎行组数 = "无序"、间距 = "—"：规范未给间距判据（无序结构是地质描述量），
+ *    自动判级永不命中，只能由人工在分段页覆盖。
+ */
 export function defaultIntegrityCriteria(): IntegrityLevelCriterion[] {
+  return [
+    { levelKey: 'Broken', jointSetCount: '无序', jointSpacing: '—', jointDevelopment: '—' },
+    { levelKey: 'RelativelyBroken', jointSetCount: '>3', jointSpacing: '≤10', jointDevelopment: '很发育' },
+    { levelKey: 'Poor', jointSetCount: '2~3', jointSpacing: '≤10', jointDevelopment: '发育' },
+    { levelKey: 'Poor', jointSetCount: '2~3', jointSpacing: '30~10', jointDevelopment: '较发育' },
+    { levelKey: 'RelativelyIntact', jointSetCount: '2~3', jointSpacing: '50~30', jointDevelopment: '中等发育' },
+    { levelKey: 'RelativelyIntact', jointSetCount: '1~2', jointSpacing: '100~50', jointDevelopment: '轻度发育' },
+    { levelKey: 'Intact', jointSetCount: '1~2', jointSpacing: '>100', jointDevelopment: '不发育' },
+  ];
+}
+
+/**
+ * 旧版（≤2.0.3）内置默认表。仅用于数据库迁移识别：库里存的判定表若与它逐字段相同，
+ * 说明用户从未改过判定表、只是被旧默认值污染，加载时自动替换为现行规范默认表。
+ */
+export function legacyIntegrityCriteriaV1(): IntegrityLevelCriterion[] {
   return [
     { levelKey: 'Broken', jointSetCount: '—', jointSpacing: '<2', jointDevelopment: '' },
     { levelKey: 'RelativelyBroken', jointSetCount: '—', jointSpacing: '2~10', jointDevelopment: '' },
@@ -91,6 +123,7 @@ export function defaultThresholds(): SpecThresholds {
     mergeRunsIntoRockSegments: true,
     rockSegmentMinThicknessM: 1.0,
     rockSegmentSpacingToleranceRatio: 0.5,
+    fragMeanSizeThresholdCm: 3.3,
   };
 }
 

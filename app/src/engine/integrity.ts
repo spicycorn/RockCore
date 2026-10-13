@@ -1,21 +1,27 @@
 /**
- * 表 F.0.4「岩体完整程度划分」判定引擎（逐行移植自 1.x IntegrityCriteriaEngine，语义保持一致）。
+ * 表 F.0.4「岩体完整程度划分」判定引擎。
  *
  * 判定依据为可配置的 IntegrityLevelCriterion 表（规范设置中可编辑），
- * 配置为空时回退到内置默认表。
+ * 配置为空时回退到内置默认表（DL/T 5894-2025 表 F.0.4 原样）。
  *
- * 自动判级（Excel 导入）走 tryMatchBySpacing：**只按结构面间距查表**，
- * 「结构面发育组数」不参与匹配——组数是地质描述量，回次取芯数据算不出它。
- * tryMatch 保留给组数确已知的场景（人工地质描述）。
+ * 自动判级（Excel 导入）走「估算组数 + 间距」联合查表：
+ * 组数（结构面方位族数）无法从块数直接量测，但规范表的组数列与间距列单调相关
+ * （>50cm↔1~2 组；10~50cm↔2~3 组；≤10cm↔2~3 组或 >3 组），唯一需要
+ * 额外信息的是 ≤10cm 档——用碎屑（连续 <10cm 碎块，现场记「长度,块数」）收口：
+ * 碎屑是多组结构面交叉切割的产物，其平均块径（碎屑长÷碎屑块数）低于阈值
+ * （默认 3.3cm ≈ 10cm÷3 组）→ >3 组（很发育）；否则 → 2~3 组（发育）。
+ * 估算规则见 estimateJointSetCount。
+ * 破碎行（组数=无序、间距=—）没有间距判据，自动判级永不命中，仅人工覆盖。
  *
  * 区间记法（与规范表写法一致，大小写不敏感）：
- *   结构面发育组数（整数，仅 tryMatch 使用）：
- *     "1~2" → 1 ≤ J ≤ 2；">3" → J > 3；"—"/"——"/空 → 不限制
+ *   结构面发育组数（整数，tryMatch / 自动判级使用）：
+ *     "1~2" → 1 ≤ J ≤ 2；">3" → J > 3；"—"/"不限"/空 → 不限制；
+ *     "无序" → 无法解析为整数 → 该行永不自动命中（破碎行的规范语义）
  *   结构面间距（cm，实数）：
- *     "50~95" → 50 < S ≤ 95（下限开、上限闭，与规范表 ">50~100" 类写法一致）
- *     ">95" → S > 95；"<2" → S < 2；"≤10"/"<=10" → S ≤ 10；"—"/空 → 不限制
+ *     "100~50" → 50 < S ≤ 100（下限开、上限闭，降序写法自动交换，与规范表一致）
+ *     ">100" → S > 100；"≤10" → S ≤ 10；"—"/空 → 不限制（不参与间距匹配）
  *
- * 判定顺序：按表中行的先后顺序（第 1 行最严格），首次匹配即返回。
+ * 判定顺序：按表中行的先后顺序（第 1 行优先），首次匹配即返回。
  */
 
 import { IntegrityLevel, parseIntegrityLevelKey as parseLevelKey } from './enums';
@@ -154,9 +160,8 @@ function spacingInRange(range: SpacingRange, spacingCm: number): boolean {
 }
 
 /**
- * 仅按「结构面间距」查找首次匹配行（按行序，第 1 行优先）——自动判级的唯一入口。
- * 刻意忽略 jointSetCount：组数不是回次能测出的量，让它参与匹配只会让表形同虚设。
- * 无法解析间距的行跳过。
+ * 仅按「结构面间距」查找首次匹配行（按行序，第 1 行优先）——组数信息不可用时的容错路径。
+ * 间距为「—/不限」（无间距判据）的行跳过：这类行（如破碎行）规范上就不该由间距自动命中。
  */
 export function tryMatchBySpacing(
   criteria: IntegrityLevelCriterion[] | null | undefined,
@@ -165,7 +170,7 @@ export function tryMatchBySpacing(
   if (criteria == null || criteria.length === 0) return null;
   for (const c of criteria) {
     const range = parseSpacingRange(c.jointSpacing);
-    if (range == null) continue;
+    if (range == null || range.any) continue;
     if (spacingInRange(range, spacingCm)) return c;
   }
   return null;
@@ -194,30 +199,57 @@ export function tryMatch(
 }
 
 /**
- * 判级（导入自动判级入口）。只使用平均间距：「结构面发育组数」不参与匹配。
- * 默认表已覆盖 S>0 的全部区间；S≤0 说明该段没有任何结构面计数，保守按"完整性差"。
+ * 从回次取芯数据估算结构面发育组数（用于表 F.0.4 联合查表）。
+ *
+ * 规范表的组数列与间距列单调相关，估算只需还原这一对应：
+ *   S > 50cm          → 2 组（表中 1~2 组档）
+ *   10 < S ≤ 50cm     → 3 组（表中 2~3 组档）
+ *   S ≤ 10cm          → 表中 2~3 组（完整性差·发育）与 >3 组（较破碎·很发育）并存。
+ *                       组数是多组结构面交叉切割的产物，碎屑正是它的直接痕迹：
+ *                       碎屑平均块径（碎屑长÷碎屑块数）< fineFragMeanCm
+ *                       （默认 3.3cm ≈ 10cm÷3 组——3 组在 10cm 内均匀切割的块径）
+ *                       → >3 组；块径不小于阈值或该段无碎屑 → 2~3 组。
+ * 估算值只用于查表匹配；人工地质描述可在设置/分段页直接覆盖最终等级。
+ */
+export function estimateJointSetCount(
+  spacingCm: number,
+  fragMeanSizeCm: number,
+  fineFragMeanCm = 3.3,
+): number {
+  if (spacingCm > 50) return 2;
+  if (spacingCm > 10) return 3;
+  return Number.isFinite(fragMeanSizeCm) && fragMeanSizeCm < fineFragMeanCm ? 4 : 3;
+}
+
+/**
+ * 判级（导入自动判级入口）：估算组数 + 间距联合查表；组数条件不兼容（用户把组数
+ * 改成与估算永远矛盾的值）时退回纯间距匹配；再无匹配按规范分档兜底，避免整孔 Unknown。
+ * S≤0 说明该段没有任何结构面计数，保守按"完整性差"。
+ * @param fragMeanSizeCm 段/行的碎屑平均块径（cm）；无碎屑传 NaN（≤10cm 档按 2~3 组）
  */
 export function judgeIntegrity(
   spacingCm: number,
   criteria: IntegrityLevelCriterion[] | null | undefined,
+  fragMeanSizeCm = Number.NaN,
+  fineFragMeanCm = 3.3,
 ): IntegrityLevel {
   if (spacingCm <= 0) return IntegrityLevel.Poor;
 
   const list = criteria != null && criteria.length > 0 ? criteria : defaultIntegrityCriteria();
-  const hit = tryMatchBySpacing(list, spacingCm);
+  const est = estimateJointSetCount(spacingCm, fragMeanSizeCm, fineFragMeanCm);
+  const hit = tryMatch(list, est, spacingCm) ?? tryMatchBySpacing(list, spacingCm);
   if (hit != null) {
     const level = parseLevelKey(hit.levelKey);
     if (level !== IntegrityLevel.Unknown) return level;
   }
 
-  // 用户把判定表改坏（区间写空/写错）导致无匹配时按间距兜底，避免整孔 Unknown。
-  // 分档与内置默认表一致。
-  if (spacingCm > 95) return IntegrityLevel.Intact;
-  if (spacingCm > 50) return IntegrityLevel.RelativelyIntact;
+  // 用户把判定表改坏（区间写空/写错）导致无匹配时的兜底，分档与规范默认表一致。
+  if (spacingCm > 100) return IntegrityLevel.Intact;
   if (spacingCm > 30) return IntegrityLevel.RelativelyIntact;
   if (spacingCm > 10) return IntegrityLevel.Poor;
-  if (spacingCm > 2) return IntegrityLevel.RelativelyBroken;
-  return IntegrityLevel.Broken;
+  return estimateJointSetCount(spacingCm, fragMeanSizeCm, fineFragMeanCm) > 3
+    ? IntegrityLevel.RelativelyBroken
+    : IntegrityLevel.Poor;
 }
 
 export { parseIntegrityLevelKey as parseLevelKey } from './enums';

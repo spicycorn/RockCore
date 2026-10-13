@@ -123,7 +123,7 @@ describe('previewWorkbook：解析与拆段', () => {
     expect(row.totalPieces).toBe(2);
     expect(row.avgSpacingCm).toBe(100);
     expect(row.rqd).toBe(100);
-    expect(row.level).toBe(IntegrityLevel.Intact); // S=100 > 95
+    expect(row.level).toBe(IntegrityLevel.RelativelyIntact); // S=100 ∈ (50,100] 较完整档
     expect(row.status).toBe('ok');
     expect(row.depthStart).toBe(0);
     expect(row.depthEnd).toBe(2);
@@ -153,6 +153,16 @@ describe('previewWorkbook：解析与拆段', () => {
     expect(p.rows[0].depthEnd).toBe(0.05);
     expect(p.rows[1].pieces).toEqual([140]);
     expect(p.rows[1].depthStart).toBe(0.05);
+  });
+
+  it('≤10cm 间距档按碎屑平均块径分档：<3.3cm→较破碎，≥3.3cm→完整性差', async () => {
+    // 块径 90/30=3cm < 3.3 → >3 组 → 较破碎（S=100/30≈3.33cm ≤10）
+    const fine = await previewWorkbook(await buildWorkbook([[1, 1.0]], [[1, F, 0.9, 30]]), config);
+    expect(fine.rows[0].avgSpacingCm).toBeCloseTo(3.33, 1);
+    expect(fine.rows[0].level).toBe(IntegrityLevel.RelativelyBroken);
+    // 块径 90/10=9cm ≥ 3.3 → 2~3 组 → 完整性差
+    const coarse = await previewWorkbook(await buildWorkbook([[1, 1.0]], [[1, F, 0.9, 10]]), config);
+    expect(coarse.rows[0].level).toBe(IntegrityLevel.Poor);
   });
 
   it('空格跳过但顺序连贯 → 警告', async () => {

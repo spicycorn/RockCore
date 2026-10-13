@@ -6,7 +6,13 @@ import Database from '@tauri-apps/plugin-sql';
 import { ensureSchema, SCHEMA_VERSION } from './schema';
 import type { Sql } from './repos';
 import { getSetting, setSetting } from './repos';
-import { defaultConfig, ensureDefaults, type RockSpecificationConfig } from '../engine/config';
+import {
+  defaultConfig,
+  defaultIntegrityCriteria,
+  ensureDefaults,
+  legacyIntegrityCriteriaV1,
+  type RockSpecificationConfig,
+} from '../engine/config';
 
 const DB_FILE = 'sqlite:rockcore.db';
 export const CONFIG_SETTING_KEY = 'spec_config_v1';
@@ -38,7 +44,13 @@ export async function loadConfig(db: Sql): Promise<RockSpecificationConfig> {
   const raw = await getSetting(db, CONFIG_SETTING_KEY);
   if (raw == null) return defaultConfig();
   try {
-    return ensureDefaults(JSON.parse(raw) as Partial<RockSpecificationConfig>);
+    const config = ensureDefaults(JSON.parse(raw) as Partial<RockSpecificationConfig>);
+    // 迁移：库里存的判定表若与旧版内置默认表逐字段相同，说明用户从未编辑过，
+    // 直接换成现行规范（DL/T 5894-2025 表 F.0.4）默认表；用户改过的不动。
+    if (JSON.stringify(config.integrityLevelCriteria) === JSON.stringify(legacyIntegrityCriteriaV1())) {
+      config.integrityLevelCriteria = defaultIntegrityCriteria();
+    }
+    return config;
   } catch {
     return defaultConfig();
   }

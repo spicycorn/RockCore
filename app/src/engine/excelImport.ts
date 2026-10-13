@@ -620,7 +620,12 @@ function emitRun(
     row.depthStart = Math.round(d * 1000) / 1000;
     row.depthEnd = Math.round((d + (row.runLengthM as number)) * 1000) / 1000;
     d += row.runLengthM as number;
-    row.level = judgeIntegrity(row.avgSpacingCm, config.integrityLevelCriteria);
+    // 碎屑平均块径（cm）：仅「长度,块数」记录的碎屑参与；无碎屑 → NaN
+    const fragMean = (row.fragCount ?? 0) > 0 && row.fragLengthCm != null
+      ? row.fragLengthCm / (row.fragCount as number)
+      : Number.NaN;
+    row.level = judgeIntegrity(row.avgSpacingCm, config.integrityLevelCriteria, fragMean,
+      config.thresholds.fragMeanSizeThresholdCm);
 
     if (row.avgSpacingCm > 500 && errors.length === 0) {
       row.messages.push('平均间距 >500cm，疑似长度按 cm 误填（模板单位米）');
@@ -668,6 +673,8 @@ export function rebuildSegments(
       depthEnd: r.depthEnd,
       totalPieces: r.totalPieces,
       totalLengthCm: r.totalLengthCm,
+      fragCount: r.fragCount ?? 0,
+      fragLengthCm: r.fragLengthCm ?? 0,
       // Excel 选填列带来的岩质参与强制分界（未填=0 不设限）
       rockTypeKey: r.rockType,
     });
@@ -692,7 +699,8 @@ export function rebuildSegments(
       totalPieces: seg.totalPieces,
       spacingCm: seg.spacingCm,
       rqd: seg.rqd,
-      level: judgeIntegrity(seg.spacingCm, config.integrityLevelCriteria),
+      level: judgeIntegrity(seg.spacingCm, config.integrityLevelCriteria, seg.fragMeanSizeCm,
+        config.thresholds.fragMeanSizeThresholdCm),
       rockType: srcRows.find((r) => r.rockType !== RockType.NotSet)?.rockType ?? RockType.NotSet,
       structureType: srcRows.find((r) => r.structureType !== RockStructureType.NotSet)?.structureType
         ?? RockStructureType.NotSet,
