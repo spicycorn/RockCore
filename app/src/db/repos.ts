@@ -18,7 +18,31 @@ import {
 export interface Sql {
   execute(sql: string, bind?: unknown[]): Promise<unknown>;
   select<T>(sql: string, bind?: unknown[]): Promise<T[]>;
-  transaction(ops: { query: string; values?: unknown[] }[]): Promise<unknown>;
+}
+
+/**
+ * 事务执行一组语句。
+ * @tauri-apps/plugin-sql 2.x 的 Database 没有 transaction() API（只有 execute/select），
+ * 直接调用会报 "transaction is not a function"；这里用 BEGIN/COMMIT/ROLLBACK 手工包裹，
+ * 失败整体回滚后抛出原始错误（连接单例，无并发写冲突）。
+ */
+export async function runOps(db: Sql, ops: { query: string; values?: unknown[] }[]): Promise<void> {
+  if (ops.length === 0) return;
+  await db.execute('BEGIN');
+  try {
+    for (const op of ops) await db.execute(op.query, op.values ?? []);
+    await db.execute('COMMIT');
+  } catch (e) {
+    try { await db.execute('ROLLBACK'); } catch { /* 回滚失败不覆盖原始错误 */ }
+    throw e;
+  }
+}
+
+/** 从 execute 返回值取自增主键（plugin-sql 返回 QueryResult.lastInsertId） */
+function lastId(res: unknown): number {
+  if (typeof res === 'number') return res;
+  const v = (res as { lastInsertId?: unknown } | null)?.lastInsertId;
+  return Number(v ?? 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +98,10 @@ export interface RunStatRow {
   joint_count: number;
   rqd: number;
   avg_spacing_cm: number;
+  /** 取芯率（%）；v2 及更早的旧数据行为 null */
+  recovery: number | null;
+  /** 1 = 破碎段（v13 模板「长度，破碎」记录）；旧数据为 0 */
+  broken: number;
 }
 
 export interface SegmentRow {
@@ -138,7 +166,7 @@ export async function createProject(db: Sql, p: ProjectInput): Promise<number> {
     'INSERT INTO projects (project_number, name, phase, cave_axis_azimuth, created_at) VALUES (?1, ?2, ?3, ?4, ?5)',
     [p.project_number, p.name, p.phase, p.cave_axis_azimuth, new Date().toISOString()],
   );
-  return Number(res);
+  return lastId(res);
 }
 
 export async function updateProject(db: Sql, id: number, p: ProjectInput): Promise<void> {
@@ -150,7 +178,7 @@ export async function updateProject(db: Sql, id: number, p: ProjectInput): Promi
 
 export async function deleteProject(db: Sql, id: number): Promise<void> {
   // 显式级联（不依赖 PRAGMA foreign_keys 在连接池下的表现）
-  await db.transaction([
+  await runOps(db, [
     { query: 'DELETE FROM attachments WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
     { query: 'DELETE FROM segments WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1)', values: [id] },
     { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id IN (SELECT id FROM boreholes WHERE project_id = ?1))', values: [id] },
@@ -184,7 +212,7 @@ export async function createBorehole(db: Sql, projectId: number, b: BoreholeInpu
     [projectId, b.number, b.orifice_elevation, b.total_depth, b.groundwater_depth,
       b.azimuth, b.inclination_angle, b.orifice_x, b.orifice_y, b.orifice_z],
   );
-  return Number(res);
+  return lastId(res);
 }
 
 export async function updateBorehole(db: Sql, id: number, b: BoreholeInput): Promise<void> {
@@ -198,7 +226,7 @@ export async function updateBorehole(db: Sql, id: number, b: BoreholeInput): Pro
 }
 
 export async function deleteBorehole(db: Sql, id: number): Promise<void> {
-  await db.transaction([
+  await runOps(db, [
     { query: 'DELETE FROM attachments WHERE borehole_id = ?1', values: [id] },
     { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [id] },
     { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [id] },
@@ -228,7 +256,7 @@ export async function saveImport(
   rows: readonly ImportRow[],
   segments: readonly ImportSegment[],
 ): Promise<number> {
-  await db.transaction([
+  await runOps(db, [
     { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [boreholeId] },
     { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [boreholeId] },
     { query: 'DELETE FROM import_batches WHERE borehole_id = ?1', values: [boreholeId] },
@@ -238,7 +266,7 @@ export async function saveImport(
      VALUES (?1, ?2, ?3, ?4, ?5)`,
     [boreholeId, batch.fileName, new Date().toISOString(), batch.startDepth, batch.runCount],
   );
-  const batchId = Number(batchRes);
+  const batchId = lastId(batchRes);
 
   const ops: { query: string; values?: unknown[] }[] = [];
   for (const r of rows) {
@@ -246,11 +274,11 @@ export async function saveImport(
     ops.push({
       query: `INSERT INTO run_stats (batch_id, run_no, part_index, part_total, depth_start, depth_end,
           run_length_m, run_total_length_m, frag_count, frag_length_cm, pieces,
-          total_pieces, joint_count, rqd, avg_spacing_cm)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
+          total_pieces, joint_count, rqd, avg_spacing_cm, recovery, broken)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`,
       values: [batchId, r.runNo, r.runPartIndex, r.runRowCount, r.depthStart, r.depthEnd,
         r.runLengthM, r.runTotalLengthM, r.fragCount, r.fragLengthCm, JSON.stringify(r.pieces),
-        r.totalPieces, r.jointCount, r.rqd, r.avgSpacingCm],
+        r.totalPieces, r.jointCount, r.rqd, r.avgSpacingCm, r.recoveryPct, r.broken ? 1 : 0],
     });
   }
   for (const s of segments) {
@@ -264,7 +292,7 @@ export async function saveImport(
         s.rockType, s.structureType, s.hardness, new Date().toISOString()],
     });
   }
-  if (ops.length > 0) await db.transaction(ops);
+  if (ops.length > 0) await runOps(db, ops);
   return batchId;
 }
 
@@ -313,7 +341,7 @@ export async function saveSegmentClassifications(
 ): Promise<void> {
   if (writes.length === 0) return;
   const now = new Date().toISOString();
-  await db.transaction(writes.map((w) => ({
+  await runOps(db, writes.map((w) => ({
     query: `UPDATE segments SET integrity_override = ?1, rock_type = ?2, structure_type = ?3,
         hardness = ?4, homogeneity = ?5, groundwater = ?6, cave_angle_lt30 = ?7,
         rock_class = ?8, basis = ?9, updated_at = ?10

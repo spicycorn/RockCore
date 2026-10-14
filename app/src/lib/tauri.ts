@@ -16,9 +16,9 @@ export async function readFileBytes(path: string): Promise<ArrayBuffer> {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
-/** 写字节到任意本地路径（导出报表用） */
+/** 写字节到任意本地路径（导出报表用）；Uint8Array 走 Tauri IPC 原始字节通道，不逐元素装箱 */
 export function writeFileBytes(path: string, bytes: Uint8Array): Promise<void> {
-  return invoke<void>('write_file_bytes', { path, bytes: Array.from(bytes) });
+  return invoke<void>('write_file_bytes', { path, bytes });
 }
 
 /** 读取随安装包内嵌的导入模板字节 */

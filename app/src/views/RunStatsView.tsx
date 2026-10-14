@@ -1,6 +1,6 @@
 /**
  * 回次明细：入库后的回次记录段（只读）。每行 = 一个记录段，
- * 拆段回次显示 回次-序；碎屑段显示 长/块。右键行可按段号过滤。
+ * 拆段回次显示 回次-序；碎屑显示 长/块，破碎段显示「破碎」。右键行可按段号过滤。
  */
 
 import { useMemo, useState } from 'react';
@@ -40,7 +40,7 @@ export function RunStatsView() {
             只看回次 {filterRun} ✕
           </button>
         )}
-        <span className="ml-auto text-xs text-slate-400">n = ≥10cm 完整段数 + 碎屑块数 · S = 段厚÷n · RQD = ΣL÷段厚</span>
+        <span className="ml-auto text-xs text-slate-400">n = 正常段格数（破碎段不计） · S = 段厚÷n · RQD = ΣL(≥10cm)÷段厚</span>
       </div>
       <div className="flex-1 overflow-auto bg-surface">
         <table className="rc-table">
@@ -48,8 +48,8 @@ export function RunStatsView() {
             <tr>
               <th>回次</th><th>深度 (m)</th><th className="rc-num">本段厚(m)</th><th className="rc-num">回次进尺(m)</th>
               <th className="rc-num">n</th><th className="rc-num">节理数 n-1</th>
-              <th className="rc-num">S (cm)</th><th className="rc-num">RQD (%)</th>
-              <th className="rc-num">碎屑 长/块</th><th>≥10cm 段长 (cm)</th>
+              <th className="rc-num">S (cm)</th><th className="rc-num">RQD (%)</th><th className="rc-num">取芯率 (%)</th>
+              <th className="rc-num">碎屑 长/块·破碎</th><th>段长列表 (cm)</th>
             </tr>
           </thead>
           <tbody>
@@ -65,7 +65,8 @@ export function RunStatsView() {
                   <td className="rc-num">{r.joint_count}</td>
                   <td className="rc-num">{r.avg_spacing_cm.toFixed(2)}</td>
                   <td className="rc-num">{r.rqd.toFixed(2)}</td>
-                  <td className="rc-num">{r.frag_count == null ? '—' : `${(r.frag_length_cm ?? 0).toFixed(1)}/${r.frag_count}`}</td>
+                  <td className="rc-num">{r.recovery == null ? '—' : r.recovery.toFixed(1)}</td>
+                  <td className="rc-num">{r.broken ? '破碎' : r.frag_count == null ? '—' : `${(r.frag_length_cm ?? 0).toFixed(1)}/${r.frag_count}`}</td>
                   <td className="text-xs text-slate-500">{pieces.length > 0 ? pieces.map((p) => p.toFixed(1)).join('，') : '—'}</td>
                 </tr>
               );

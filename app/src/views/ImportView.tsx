@@ -46,14 +46,14 @@ export function ImportView() {
             导入钻孔 {borehole.number} 的回次数据
           </div>
           <p className="text-xs text-slate-500 leading-5 mb-4">
-            使用 v12 模板填写（一行一回次）：「基本信息」填钻孔编号；「岩心记录」填 回次号/进尺(m) 与 岩心段1..20——按由浅到深一段一格：整段只填长度（≥0.1m），不足10厘米破碎带填 长度,块数（如 0.08,3），RQD 列自动计算；行尾选填 岩质/结构类型/坚硬程度。第 2 行黄底是填写提示，数据从第 3 行起。
+            使用 v13 模板填写（一行一回次）：第 1 行 B1 填钻孔编号；「岩心记录」填 回次号/进尺(m)，岩心段从 G 列起一段一格、按由浅到深依次填、列数不限——每段只填长度（米，短于10厘米也直接填数字），压碎到无法逐块记录的破碎段填 长度，破碎（如 1.8，破碎）；RQD 列自动计算（只统计≥10cm段）；D..F 列选填 岩质/结构类型/坚硬程度。第 3 行灰字是填写提示，数据从第 4 行起。
             软件会校验闭合、重算 RQD 与平均间距、按表 F.0.4 判完整性、归并完整性分段，并在下一步引导录入围岩分类参数。
           </p>
           <div className="flex items-center gap-2">
             <Button variant="primary" className="h-9 px-4 text-sm" title="Ctrl+I" onClick={() => startImport()}>
               选择 Excel 文件导入…
             </Button>
-            <Button className="h-9 px-3" onClick={() => void downloadTemplate()} title="保存随安装包发布的 v12 空白模板">
+            <Button className="h-9 px-3" onClick={() => void downloadTemplate()} title="保存随安装包发布的 v13 空白模板">
               下载导入模板
             </Button>
             <Button className="h-9 px-3" onClick={() => setAttachOpen(true)} title="为当前钻孔附加岩心照片等文件（保存在本机数据库，可预览）">

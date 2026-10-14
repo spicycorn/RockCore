@@ -4,9 +4,9 @@
 
 import * as echarts from 'echarts/core';
 import { BarChart, CustomChart, PieChart, ScatterChart } from 'echarts/charts';
-import { GridComponent, TooltipComponent } from 'echarts/components';
+import { GridComponent, TitleComponent, TooltipComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
-echarts.use([BarChart, CustomChart, PieChart, ScatterChart, GridComponent, TooltipComponent, CanvasRenderer]);
+echarts.use([BarChart, CustomChart, PieChart, ScatterChart, GridComponent, TitleComponent, TooltipComponent, CanvasRenderer]);
 
 export { echarts };

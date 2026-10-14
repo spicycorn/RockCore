@@ -19,14 +19,16 @@ export interface RockMassRunInput {
   depthStart: number;
   /** 回次终点（m） */
   depthEnd: number;
-  /** 岩心总段数 n = ≥10cm 段数 + 碎屑数 */
+  /** 岩心总段数 n = 正常段格数（破碎段不计） */
   totalPieces: number;
   /** ≥10cm 岩心段累计长度（cm） */
   totalLengthCm: number;
-  /** 碎屑块数（「长度,块数」记录的块数之和）；0 = 无碎屑 */
+  /** 碎屑（<10cm 短段）块数；0 = 无碎屑 */
   fragCount?: number;
-  /** 碎屑累计长度（cm） */
+  /** 碎屑（<10cm 短段）累计长度（cm） */
   fragLengthCm?: number;
+  /** true = 破碎段（现场记「长度，破碎」）：与正常段强制分界，等级直接取「破碎」 */
+  broken?: boolean;
   /** F.0.2 岩质键值（RockType 编码）；0 或负数表示未填（未填时不作为强制分界） */
   rockTypeKey: number;
 }
@@ -82,6 +84,11 @@ export class RockMassSegment {
   /** 段的碎屑平均块径（cm）= Σ碎屑长 ÷ Σ碎屑块数；无碎屑 → NaN */
   get fragMeanSizeCm(): number {
     return this.fragCount > 0 ? round(this.fragLengthCm / this.fragCount, 2) : Number.NaN;
+  }
+
+  /** 组内是否含破碎段（含则整段直接判「破碎」，不再走间距判级） */
+  get hasBroken(): boolean {
+    return this.runs.some((r) => r.broken === true);
   }
 
   /** 组内回次的岩质键值（取第一个已填的；都没填返回 0） */
@@ -171,6 +178,9 @@ function canMerge(group: RockMassSegment, run: RockMassRunInput, tolerance: numb
   // 强制分界 2：岩质已知且不同
   const groupRock = group.rockTypeKey;
   if (groupRock > 0 && run.rockTypeKey > 0 && groupRock !== run.rockTypeKey) return false;
+
+  // 强制分界 3：破碎段与正常段不并（破碎段之间可以并）
+  if ((run.broken === true) !== group.runs.some((r) => r.broken === true)) return false;
 
   // 软条件：该回次自身的平均间距与当前段平均间距的相对差须在容差内。
   // 必须用「回次 vs 段」而不是「合并后 vs 段」：后者会让已经很大的段对新的、

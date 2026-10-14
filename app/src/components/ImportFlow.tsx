@@ -142,7 +142,7 @@ export function ImportFlowHost() {
             {preview.boreholeNo != null && (
               <span
                 className={boreholeMismatch ? 'text-[13px] font-medium text-amber-600' : 'text-[13px] text-slate-600'}
-                title={boreholeMismatch ? 'Excel 内填写的钻孔编号与当前选中钻孔不同，数据将写入当前选中钻孔' : '来自 Excel「基本信息」表'}
+                title={boreholeMismatch ? 'Excel 内填写的钻孔编号与当前选中钻孔不同，数据将写入当前选中钻孔' : '来自 Excel「岩心记录」第 1 行 B1'}
               >
                 Excel 钻孔编号：{preview.boreholeNo}
                 {boreholeMismatch && `（当前选中「${selectedBorehole?.number}」，将导入到当前选中钻孔）`}
@@ -158,8 +158,8 @@ export function ImportFlowHost() {
                 <tr>
                   <th>状态</th><th>回次</th><th>深度 (m)</th><th className="rc-num">本段厚(m)</th>
                   <th className="rc-num">回次进尺(m)</th><th className="rc-num">n</th>
-                  <th className="rc-num">S(cm)</th><th className="rc-num">RQD(%)</th>
-                  <th>完整性</th><th>岩质/结构/坚硬</th><th className="rc-num">碎屑 长/块</th><th className="rc-num">分段</th><th>提示</th>
+                  <th className="rc-num">S(cm)</th><th className="rc-num">RQD(%)</th><th className="rc-num">取芯率(%)</th>
+                  <th>完整性</th><th>岩质/结构/坚硬</th><th className="rc-num">碎屑 长/块·破碎</th><th className="rc-num">分段</th><th>提示</th>
                 </tr>
               </thead>
               <tbody>
@@ -201,10 +201,11 @@ function PreviewRow({ row }: { row: ImportRow }) {
       <td>{runNoText(row)}</td>
       <td className="rc-num">{depthText(row)}</td>
       <td className="rc-num">{row.runLengthM?.toFixed(3) ?? '—'}</td>
-      <td className="rc-num">{row.runTotalLengthM?.toFixed(3) ?? '—'}</td>
+      <td className="rc-num">{row.runTotalLengthM?.toFixed(2) ?? '—'}</td>
       <td className="rc-num">{row.totalPieces}</td>
       <td className="rc-num">{spacingText(row.avgSpacingCm)}</td>
       <td className="rc-num">{row.rqd?.toFixed(2) ?? '—'}</td>
+      <td className="rc-num">{row.recoveryPct?.toFixed(1) ?? '—'}</td>
       <td>{row.level !== 0 ? <Badge color="#5b7fae">{integrityLevelLabel[row.level]}</Badge> : '—'}</td>
       <td className="whitespace-nowrap text-xs" title={paramTitle(row)}>
         {row.rockType !== RockType.NotSet ? rockTypeLabel[row.rockType] : ''}

@@ -4,7 +4,7 @@
  */
 
 /** 当前模式版本；后续结构变更时递增并补 migrate() 分支 */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 4;
 
 export const SCHEMA_DDL = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -55,7 +55,9 @@ CREATE TABLE IF NOT EXISTS run_stats (
   total_pieces       INTEGER NOT NULL,
   joint_count        INTEGER NOT NULL,
   rqd                REAL NOT NULL,
-  avg_spacing_cm     REAL NOT NULL
+  avg_spacing_cm     REAL NOT NULL,
+  recovery           REAL,
+  broken             INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS segments (
@@ -123,7 +125,10 @@ export async function ensureSchema(
   // 旧库：先补建缺失表（IF NOT EXISTS 幂等），再按版本逐级迁移
   for (const stmt of splitStatements(SCHEMA_DDL)) await exec(stmt);
   if (v < SCHEMA_VERSION) {
-    // 未来版本迁移分支写在这里
+    // v3：run_stats 增取芯率列（少记不再警告，改记取芯率）
+    if (v < 3) await exec('ALTER TABLE run_stats ADD COLUMN recovery REAL');
+    // v4：run_stats 增破碎段标记列（v13 模板「长度，破碎」记录）
+    if (v < 4) await exec('ALTER TABLE run_stats ADD COLUMN broken INTEGER NOT NULL DEFAULT 0');
     await setVersion(SCHEMA_VERSION);
   }
 }
