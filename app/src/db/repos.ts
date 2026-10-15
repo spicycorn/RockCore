@@ -1,6 +1,6 @@
 /**
  * 数据访问层：全部 SQL 集中在这里，UI 不写 SQL。
- * 只依赖最小 Sql 接口（@tauri-apps/plugin-sql 的 Database 天然满足），
+ * 只依赖最小 Sql 接口（database.ts 把 Rust 命令 db_execute/db_select/db_transaction 适配到它），
  * 便于将来在测试里注入替身。
  */
 
@@ -18,27 +18,24 @@ import {
 export interface Sql {
   execute(sql: string, bind?: unknown[]): Promise<unknown>;
   select<T>(sql: string, bind?: unknown[]): Promise<T[]>;
+  /**
+   * 单事务执行一组语句（Rust 端单连接全程持锁，事务之间不可能交错）。
+   * 返回最后一条 INSERT 的自增 id；无 INSERT 时为 0。
+   */
+  transaction(statements: { sql: string; params?: unknown[] }[]): Promise<number>;
 }
 
 /**
- * 事务执行一组语句。
- * @tauri-apps/plugin-sql 2.x 的 Database 没有 transaction() API（只有 execute/select），
- * 直接调用会报 "transaction is not a function"；这里用 BEGIN/COMMIT/ROLLBACK 手工包裹，
- * 失败整体回滚后抛出原始错误（连接单例，无并发写冲突）。
+ * 事务执行一组语句：整组原子提交，任一失败整体回滚并抛出原始错误。
+ * 事务控制（BEGIN/COMMIT）由 Rust 端 db_transaction 负责，JS 层永远发不出裸 BEGIN，
+ * "cannot start a transaction within a transaction" 这类问题在结构上不可能再发生。
  */
 export async function runOps(db: Sql, ops: { query: string; values?: unknown[] }[]): Promise<void> {
   if (ops.length === 0) return;
-  await db.execute('BEGIN');
-  try {
-    for (const op of ops) await db.execute(op.query, op.values ?? []);
-    await db.execute('COMMIT');
-  } catch (e) {
-    try { await db.execute('ROLLBACK'); } catch { /* 回滚失败不覆盖原始错误 */ }
-    throw e;
-  }
+  await db.transaction(ops.map((op) => ({ sql: op.query, params: op.values ?? [] })));
 }
 
-/** 从 execute 返回值取自增主键（plugin-sql 返回 QueryResult.lastInsertId） */
+/** 从 execute 返回值取自增主键（db_execute 返回 { lastInsertId, rowsAffected }） */
 function lastId(res: unknown): number {
   if (typeof res === 'number') return res;
   const v = (res as { lastInsertId?: unknown } | null)?.lastInsertId;
@@ -247,7 +244,8 @@ export interface ImportBatchInput {
 
 /**
  * 导入落库：同钻孔旧批次整体替换（对齐 1.x 语义）。
- * 批次插入单独一步取回 last_insert_rowid，明细在事务里批量写。
+ * 事务一：删旧数据 + 插新批次（原子替换，取回 batchId）；
+ * 事务二：批次明细（回次统计 + 完整性分段）。
  */
 export async function saveImport(
   db: Sql,
@@ -256,17 +254,16 @@ export async function saveImport(
   rows: readonly ImportRow[],
   segments: readonly ImportSegment[],
 ): Promise<number> {
-  await runOps(db, [
-    { query: 'DELETE FROM segments WHERE borehole_id = ?1', values: [boreholeId] },
-    { query: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', values: [boreholeId] },
-    { query: 'DELETE FROM import_batches WHERE borehole_id = ?1', values: [boreholeId] },
+  const batchId = await db.transaction([
+    { sql: 'DELETE FROM segments WHERE borehole_id = ?1', params: [boreholeId] },
+    { sql: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', params: [boreholeId] },
+    { sql: 'DELETE FROM import_batches WHERE borehole_id = ?1', params: [boreholeId] },
+    {
+      sql: `INSERT INTO import_batches (borehole_id, file_name, imported_at, start_depth, run_count)
+            VALUES (?1, ?2, ?3, ?4, ?5)`,
+      params: [boreholeId, batch.fileName, new Date().toISOString(), batch.startDepth, batch.runCount],
+    },
   ]);
-  const batchRes = await db.execute(
-    `INSERT INTO import_batches (borehole_id, file_name, imported_at, start_depth, run_count)
-     VALUES (?1, ?2, ?3, ?4, ?5)`,
-    [boreholeId, batch.fileName, new Date().toISOString(), batch.startDepth, batch.runCount],
-  );
-  const batchId = lastId(batchRes);
 
   const ops: { query: string; values?: unknown[] }[] = [];
   for (const r of rows) {
@@ -385,16 +382,17 @@ export async function getAttachment(db: Sql, id: number): Promise<AttachmentFull
   return rows.length > 0 ? rows[0] : null;
 }
 
-export async function addAttachment(
+/** 批量添加附件（多选导入）：整组一个事务，要么全部入库要么全部不入库 */
+export async function addAttachments(
   db: Sql,
   boreholeId: number,
-  a: { fileName: string; mime: string; sizeBytes: number; dataB64: string },
+  items: readonly { fileName: string; mime: string; sizeBytes: number; dataB64: string }[],
 ): Promise<void> {
-  await db.execute(
-    `INSERT INTO attachments (borehole_id, file_name, mime, size_bytes, data_b64, created_at)
-     VALUES (?1, ?2, ?3, ?4, ?5, datetime('now','localtime'))`,
-    [boreholeId, a.fileName, a.mime, a.sizeBytes, a.dataB64],
-  );
+  await runOps(db, items.map((a) => ({
+    query: `INSERT INTO attachments (borehole_id, file_name, mime, size_bytes, data_b64, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, datetime('now','localtime'))`,
+    values: [boreholeId, a.fileName, a.mime, a.sizeBytes, a.dataB64],
+  })));
 }
 
 export async function deleteAttachment(db: Sql, id: number): Promise<void> {

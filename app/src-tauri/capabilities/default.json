@@ -1,16 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "主窗口能力：SQLite、系统对话框、外部程序打开、窗口关闭、自定义文件字节读写命令",
+  "description": "主窗口能力：系统对话框、外部程序打开、窗口关闭、自定义文件字节读写与数据库命令",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-close",
-    "sql:default",
-    "sql:allow-load",
-    "sql:allow-select",
-    "sql:allow-execute",
-    "sql:allow-close",
     "dialog:default",
     "opener:default"
   ]

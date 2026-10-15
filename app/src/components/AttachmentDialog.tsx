@@ -1,17 +1,17 @@
 /**
  * 钻孔附件对话框：岩心照片等文件 base64 内嵌入库（rockcore.db），
- * 列表 / 添加 / 另存 / 删除；图片双击或右键可放大预览（点击任意处或 Esc 关闭）。
+ * 列表 / 添加（支持多选，整组一个事务）/ 另存 / 删除；图片双击或右键可放大预览（点击任意处或 Esc 关闭）。
  * 附件只做留档查看，不与数据行绑定。
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import { AppDialog, Button, EmptyState, showContextMenu } from './ui';
 import {
-  addAttachment, deleteAttachment, getAttachment, listAttachments,
+  addAttachments, deleteAttachment, getAttachment, listAttachments,
   type AttachmentRow, type BoreholeRow,
 } from '../db/repos';
 import { useApp } from '../store/app';
-import { pickAttachmentFile, saveFileAs } from '../lib/dialogs';
+import { pickAttachmentFiles, saveFileAs } from '../lib/dialogs';
 import { readFileBytes, writeFileBytes } from '../lib/tauri';
 
 /** 单文件上限 30MB（SQLite 单行 TEXT 足够，但整库文件别膨胀失控） */
@@ -77,28 +77,38 @@ export function AttachmentDialog({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [preview]);
 
-  async function addOne(): Promise<void> {
+  async function addMany(): Promise<void> {
     if (db == null || borehole == null) return;
-    const path = await pickAttachmentFile();
-    if (path == null) return;
-    try {
-      const buf = await readFileBytes(path);
-      if (buf.byteLength === 0) { toast('error', '文件为空，未添加'); return; }
-      if (buf.byteLength > MAX_BYTES) {
-        toast('error', `文件 ${fmtSize(buf.byteLength)} 超过 30MB 上限，未添加`);
-        return;
-      }
+    const paths = await pickAttachmentFiles();
+    if (paths == null || paths.length === 0) return;
+    const items: { fileName: string; mime: string; sizeBytes: number; dataB64: string }[] = [];
+    const skipped: string[] = [];
+    for (const path of paths) {
       const fileName = path.replace(/^.*[\\/]/, '');
-      const mime = EXT_MIME[extOf(fileName)] ?? 'application/octet-stream';
-      await addAttachment(db, borehole.id, {
-        fileName, mime, sizeBytes: buf.byteLength,
-        dataB64: bytesToB64(new Uint8Array(buf)),
-      });
-      toast('success', `已添加附件「${fileName}」`);
-      await reload();
-    } catch (ex) {
-      toast('error', `添加附件失败：${ex instanceof Error ? ex.message : String(ex)}`);
+      try {
+        const buf = await readFileBytes(path);
+        if (buf.byteLength === 0) { skipped.push(`${fileName}（空文件）`); continue; }
+        if (buf.byteLength > MAX_BYTES) { skipped.push(`${fileName}（${fmtSize(buf.byteLength)} 超30MB）`); continue; }
+        items.push({
+          fileName,
+          mime: EXT_MIME[extOf(fileName)] ?? 'application/octet-stream',
+          sizeBytes: buf.byteLength,
+          dataB64: bytesToB64(new Uint8Array(buf)),
+        });
+      } catch {
+        skipped.push(`${fileName}（读取失败）`);
+      }
     }
+    if (items.length > 0) {
+      try {
+        await addAttachments(db, borehole.id, items);
+        toast('success', `已添加 ${items.length} 个附件`);
+        await reload();
+      } catch (ex) {
+        toast('error', `添加附件失败：${ex instanceof Error ? ex.message : String(ex)}`);
+      }
+    }
+    if (skipped.length > 0) toast('warn', `已跳过 ${skipped.length} 个：${skipped.join('、')}`);
   }
 
   async function openPreview(a: AttachmentRow): Promise<void> {
@@ -152,14 +162,14 @@ export function AttachmentDialog({
           <span className="mr-auto text-xs text-slate-400">
             附件保存在本机数据库内，仅用于留档查看；删除钻孔会一并删除。
           </span>
-          <Button variant="primary" onClick={() => void addOne()}>添加附件…</Button>
+          <Button variant="primary" onClick={() => void addMany()}>添加附件…</Button>
           <Button onClick={onClose}>关闭</Button>
         </>
       }
     >
       <div className="min-h-40 max-h-80 overflow-auto -mx-1">
         {items.length === 0 ? (
-          <EmptyState title="还没有附件" hint="点右下方「添加附件」选择岩心照片（jpg/png/gif/webp/bmp/pdf，≤30MB）" />
+          <EmptyState title="还没有附件" hint="点右下方「添加附件」选择岩心照片，可按住 Ctrl/Shift 多选（jpg/png/gif/webp/bmp/pdf，单个≤30MB）" />
         ) : (
           <table className="w-full text-[13px]">
             <thead>

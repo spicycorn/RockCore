@@ -1,7 +1,7 @@
 {
   "name": "rockcore-app",
   "private": true,
-  "version": "1.1.0",
+  "version": "1.1.1",
   "type": "module",
   "description": "RockCore 岩心围岩评价系统（Tauri 2 + React + TypeScript）",
   "scripts": {
@@ -25,7 +25,6 @@
     "@tauri-apps/api": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-opener": "^2.2.5",
-    "@tauri-apps/plugin-sql": "^2.2.0",
     "clsx": "^2.1.1",
     "echarts": "^5.6.0",
     "exceljs": "^4.4.0",
