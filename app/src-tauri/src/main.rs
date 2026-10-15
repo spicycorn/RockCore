@@ -83,7 +83,7 @@ fn check_no_tx_control(sql: &str) -> Result<(), String> {
 
 /// 取连接锁；锁中毒（前一条语句 panic）时取回内值继续——单用户桌面应用，
 /// panic 后重试比永久不可用更符合用户预期。锁内不做任何 await，future 保持 Send。
-fn lock(state: &tauri::State<'_, DbState>) -> Result<std::sync::MutexGuard<'_, Connection>, String> {
+fn lock<'a>(state: &'a tauri::State<'a, DbState>) -> Result<std::sync::MutexGuard<'a, Connection>, String> {
     match &**state {
         Ok(db) => Ok(db.conn.lock().unwrap_or_else(PoisonError::into_inner)),
         Err(e) => Err(format!("数据库不可用：{e}")),
