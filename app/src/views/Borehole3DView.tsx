@@ -143,7 +143,8 @@ export function Borehole3DView() {
     };
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
     raw.forEach((m, i) => {
-      for (const p of [pts[i], bottomOf(m, i)]) {
+      const bt = bottomOf(m, i);
+      for (const p of [{ x: pts[i].ex, y: pts[i].ey, z: pts[i].ez }, bt]) {
         minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
         minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
