@@ -2,6 +2,8 @@
  * 分段与围岩分类编辑器：
  *  - 每段录入 F.0.2 六参数（岩质/结构/坚硬/均一/地下水/洞轴夹角），结构下拉按岩质+完整性级联；
  *  - 完整性等级默认自动判级，可逐段覆盖；
+ *  - 地下水、洞轴夹角默认「自动」：地下水按 水位埋深+倾角+段底深度 判定，
+ *    洞轴夹角按 孔方位角+倾角+洞轴线方位角 计算（<阈值判是）；均可人工覆盖；
  *  - 分类实时重算（纯函数），保存才落库；支持勾选批量应用参数；
  *  - 缺项行高亮并给出可操作提示，绝不伪造结果。
  */
@@ -11,10 +13,11 @@ import clsx from 'clsx';
 import { AppDialog, Button, EmptyState, Select, showContextMenu } from '../components/ui';
 import { useApp } from '../store/app';
 import { finalIntegrityLevel, segmentF02, type SegmentClassificationWrite } from '../db/repos';
+import { autoGroundwater, boreholeCaveAngle } from '../engine/boreholeGeometry';
 import { availableStructures } from '../engine/config';
 import { classifySegments, classificationDisplayText, missingFieldsHint, type SegmentF02 } from '../engine/classify';
 import {
-  groundwaterLabel, GroundwaterCondition, IntegrityLevel, integrityLevelLabel,
+  GroundwaterCondition, IntegrityLevel, integrityLevelLabel,
   RockClass, rockClassNumeral, RockHardnessLevel, RockHomogeneity, rockHomogeneityLabel,
   rockHardnessLabel, RockStructureType, rockStructureLabel, RockType, rockTypeLabel,
 } from '../engine/enums';
@@ -45,6 +48,8 @@ export function SegmentsView() {
   const segments = useApp((s) => s.segments);
   const config = useApp((s) => s.config);
   const boreholeId = useApp((s) => s.boreholeId);
+  const borehole = useApp((s) => s.boreholes.find((b) => b.id === s.boreholeId) ?? null);
+  const project = useApp((s) => s.projects.find((p) => p.id === s.projectId) ?? null);
   const saveSegmentEdits = useApp((s) => s.saveSegmentEdits);
   const toast = useApp((s) => s.toast);
   const setTab = useApp((s) => s.setTab);
@@ -62,23 +67,43 @@ export function SegmentsView() {
     setEdits({}); setSelected(new Set()); setDirty(false);
   }
 
-  /** 生效值 = 草稿覆盖库值 */
+  /** 洞轴夹角自动值（孔级常量）：缺任一方位/倾角输入 → null（未定） */
+  const caveThreshold = config.thresholds.caveAxisAngleThreshold;
+  const autoCaveAngle = useMemo(
+    () => boreholeCaveAngle(borehole?.azimuth ?? null, borehole?.inclination_angle ?? null, project?.cave_axis_azimuth ?? null),
+    [borehole, project],
+  );
+
+  /** 生效值 = 草稿覆盖库值；地下水/洞轴夹角选「自动」时按孔参回填 */
   const effective = useMemo(() => segments.map((row) => {
     const e = edits[row.id] ?? {};
     const base = segmentF02(row);
+    // 落库存原始覆盖值：地下水 0=自动、洞轴夹角 null=自动
+    const gwRaw = e.groundwater ?? base.groundwater;
+    const caveRaw = e.caveLt30 !== undefined ? e.caveLt30 : base.caveAxisAngleLessThan30;
+    const autoGw = autoGroundwater(row.depth_end, borehole?.inclination_angle ?? null, borehole?.groundwater_depth ?? null);
+    const gwEffective = gwRaw !== GroundwaterCondition.NotSet
+      ? gwRaw
+      : autoGw == null
+        ? GroundwaterCondition.NotSet
+        : autoGw ? GroundwaterCondition.Wet : GroundwaterCondition.Dry;
+    const caveEffective = caveRaw ?? (autoCaveAngle == null ? null : autoCaveAngle < caveThreshold);
     return {
       row,
+      gwRaw,
+      caveRaw,
+      autoGw,
       level: (e.override !== undefined ? e.override : finalIntegrityLevel(row)) as IntegrityLevel,
       f02: {
         rockType: e.rockType ?? base.rockType,
         structureType: e.structureType ?? base.structureType,
         hardnessLevel: e.hardness ?? base.hardnessLevel,
         homogeneity: e.homogeneity ?? base.homogeneity,
-        groundwater: e.groundwater ?? base.groundwater,
-        caveAxisAngleLessThan30: e.caveLt30 !== undefined ? e.caveLt30 : base.caveAxisAngleLessThan30,
+        groundwater: gwEffective,
+        caveAxisAngleLessThan30: caveEffective,
       } satisfies SegmentF02,
     };
-  }), [segments, edits]);
+  }), [segments, edits, borehole, autoCaveAngle, caveThreshold]);
 
   /** 实时分类（纯函数，不落库） */
   const classification = useMemo(() => {
@@ -113,7 +138,7 @@ export function SegmentsView() {
   }
 
   async function save(): Promise<void> {
-    const writes: SegmentClassificationWrite[] = effective.map(({ row, f02 }) => {
+    const writes: SegmentClassificationWrite[] = effective.map(({ row, f02, gwRaw, caveRaw }) => {
       const c = resultById.get(row.id)!;
       const e = edits[row.id];
       return {
@@ -124,8 +149,9 @@ export function SegmentsView() {
         structureType: f02.structureType,
         hardness: f02.hardnessLevel,
         homogeneity: f02.homogeneity,
-        groundwater: f02.groundwater,
-        caveAngleLt30: f02.caveAxisAngleLessThan30,
+        // 落库原始覆盖值（0/null=自动），生效值只进分类不落库
+        groundwater: gwRaw,
+        caveAngleLt30: caveRaw,
         rockClass: c.result.success ? c.result.rockClass : null,
         basis: c.result.basis,
       };
@@ -210,12 +236,12 @@ export function SegmentsView() {
               </th>
               <th>段号</th><th>深度 (m)</th><th className="rc-num">厚(m)</th>
               <th className="rc-num">n</th><th className="rc-num">S(cm)</th><th className="rc-num">RQD(%)</th>
-              <th>完整性</th><th>岩质</th><th>结构类型</th><th>坚硬程度</th><th>均一性</th><th>地下水</th><th>洞轴夹角&lt;30°</th>
+              <th>完整性</th><th>岩质</th><th>结构类型</th><th>坚硬程度</th><th>均一性</th><th>地下水（自动）</th><th>洞轴夹角&lt;30°（自动）</th>
               <th>围岩类别</th>
             </tr>
           </thead>
           <tbody>
-            {visible.map(({ row, level, f02 }) => {
+            {visible.map(({ row, level, f02, gwRaw, caveRaw, autoGw }) => {
               const c = resultById.get(row.id)!;
               const isDirty = edits[row.id] != null;
               const structOptions = availableStructures(config, f02.rockType, level)
@@ -243,7 +269,7 @@ export function SegmentsView() {
                             all[s.id] = {
                               rockType: f02.rockType, structureType: f02.structureType,
                               hardness: f02.hardnessLevel, homogeneity: f02.homogeneity,
-                              groundwater: f02.groundwater, caveLt30: f02.caveAxisAngleLessThan30,
+                              groundwater: gwRaw, caveLt30: caveRaw,
                             };
                           }
                           setEdits(all); setDirty(true);
@@ -326,17 +352,33 @@ export function SegmentsView() {
                   <td>
                     <Select
                       className={clsx('h-6 text-xs', f02.groundwater === GroundwaterCondition.NotSet && 'border-amber-400')}
-                      value={String(f02.groundwater)}
+                      value={String(gwRaw)}
                       onChange={(e) => patch(row.id, { groundwater: Number(e.target.value) as GroundwaterCondition })}
-                      options={opts(groundwaterLabel, '未选')}
+                      options={[
+                        {
+                          value: '0',
+                          label: autoGw == null ? '自动（未填水位埋深）' : `自动：${autoGw ? '有水' : '无水'}`,
+                        },
+                        { value: '1', label: '覆盖：无水' },
+                        { value: '3', label: '覆盖：有水' },
+                      ]}
                     />
                   </td>
                   <td>
                     <Select
                       className={clsx('h-6 text-xs', f02.caveAxisAngleLessThan30 == null && 'border-amber-400')}
-                      value={f02.caveAxisAngleLessThan30 == null ? 'unset' : f02.caveAxisAngleLessThan30 ? 'yes' : 'no'}
-                      onChange={(e) => patch(row.id, { caveLt30: e.target.value === 'unset' ? null : e.target.value === 'yes' })}
-                      options={[{ value: 'unset', label: '未定' }, { value: 'yes', label: '是' }, { value: 'no', label: '否' }]}
+                      value={caveRaw == null ? 'auto' : caveRaw ? 'yes' : 'no'}
+                      onChange={(e) => patch(row.id, { caveLt30: e.target.value === 'auto' ? null : e.target.value === 'yes' })}
+                      options={[
+                        {
+                          value: 'auto',
+                          label: autoCaveAngle == null
+                            ? '自动（缺孔向/洞轴方位）'
+                            : `自动：${autoCaveAngle.toFixed(0)}° ${autoCaveAngle < caveThreshold ? '<' + caveThreshold : '≥' + caveThreshold}`,
+                        },
+                        { value: 'yes', label: `覆盖：<${caveThreshold}°` },
+                        { value: 'no', label: `覆盖：≥${caveThreshold}°` },
+                      ]}
                     />
                   </td>
                   <td title={c.result.success ? c.result.basis : `未分类：${c.result.basis}`}>
@@ -396,7 +438,7 @@ function BatchApplyDialog({
     if (form.groundwater != null && form.groundwater !== KEEP) edit.groundwater = Number(form.groundwater) as GroundwaterCondition;
     if (form.cave === 'yes') edit.caveLt30 = true;
     else if (form.cave === 'no') edit.caveLt30 = false;
-    else if (form.cave === 'unset') edit.caveLt30 = null;
+    else if (form.cave === 'auto') edit.caveLt30 = null;
     onApply(edit);
   };
 
@@ -413,15 +455,24 @@ function BatchApplyDialog({
         <Select value={form.structure ?? KEEP} onChange={set('structure')} options={[keep, ...opts(rockStructureLabel)]} />
         <Select value={form.hardness ?? KEEP} onChange={set('hardness')} options={[keep, ...opts(rockHardnessLabel)]} />
         <Select value={form.homogeneity ?? KEEP} onChange={set('homogeneity')} options={[keep, ...opts(rockHomogeneityLabel)]} />
-        <Select value={form.groundwater ?? KEEP} onChange={set('groundwater')} options={[keep, ...opts(groundwaterLabel)]} />
+        <Select
+          value={form.groundwater ?? KEEP}
+          onChange={set('groundwater')}
+          options={[
+            keep,
+            { value: '0', label: '地下水：自动（按水位）' },
+            { value: '1', label: '地下水：覆盖无水' },
+            { value: '3', label: '地下水：覆盖有水' },
+          ]}
+        />
         <Select
           value={form.cave ?? KEEP}
           onChange={set('cave')}
           options={[
             { value: KEEP, label: '洞轴夹角（不变）' },
-            { value: 'yes', label: '洞轴夹角<30°：是' },
-            { value: 'no', label: '洞轴夹角<30°：否' },
-            { value: 'unset', label: '洞轴夹角<30°：未定' },
+            { value: 'auto', label: '洞轴夹角<30°：自动' },
+            { value: 'yes', label: '洞轴夹角<30°：覆盖是' },
+            { value: 'no', label: '洞轴夹角<30°：覆盖否' },
           ]}
         />
       </div>

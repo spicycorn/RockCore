@@ -5,7 +5,7 @@
 import { useMemo } from 'react';
 import ExcelJS from 'exceljs';
 import { useApp } from '../store/app';
-import { finalIntegrityLevel, segmentF02, type SegmentRow } from '../db/repos';
+import { finalIntegrityLevel, effectiveF02, type BoreholeRow, type ProjectRow, type SegmentRow } from '../db/repos';
 import {
   groundwaterLabel, integrityLevelLabel, rockClassText, rockHardnessLabel,
   rockHomogeneityLabel, rockStructureLabel, rockTypeLabel,
@@ -23,14 +23,19 @@ function rqdBin(rqd: number): number {
   return rqd < 25 ? 0 : rqd < 50 ? 1 : rqd < 75 ? 2 : 3;
 }
 
-function caveText(v: number | null): string {
-  return v == null ? '未定' : v === 1 ? '是' : '否';
+function caveText(v: boolean | null): string {
+  return v == null ? '未定' : v ? '是' : '否';
 }
 
-/** 成果表行（导出与表格共用一套口径） */
-function exportRows(segments: readonly SegmentRow[]): string[][] {
+/** 成果表行（导出与表格共用一套口径；地下水/洞轴夹角按孔参自动判定后落表） */
+function exportRows(
+  segments: readonly SegmentRow[],
+  borehole: BoreholeRow | null,
+  project: ProjectRow | null,
+  caveAngleThreshold: number,
+): string[][] {
   return segments.map((s) => {
-    const f02 = segmentF02(s);
+    const f02 = effectiveF02(s, borehole, project, caveAngleThreshold);
     return [
       String(s.seq),
       s.depth_start.toFixed(2),
@@ -45,7 +50,7 @@ function exportRows(segments: readonly SegmentRow[]): string[][] {
       rockHardnessLabel[f02.hardnessLevel],
       rockHomogeneityLabel[f02.homogeneity],
       groundwaterLabel[f02.groundwater],
-      caveText(s.cave_angle_lt30),
+      caveText(f02.caveAxisAngleLessThan30),
       s.rock_class == null ? '未分类' : rockClassText(s.rock_class as RockClass),
       s.basis ?? '',
     ];
@@ -59,6 +64,8 @@ const EXPORT_HEADERS = [
 
 export function StatsView() {
   const borehole = useApp((s) => s.boreholes.find((b) => b.id === s.boreholeId) ?? null);
+  const project = useApp((s) => s.projects.find((p) => p.id === s.projectId) ?? null);
+  const caveThreshold = useApp((s) => s.config.thresholds.caveAxisAngleThreshold);
   const segments = useApp((s) => s.segments);
   const toast = useApp((s) => s.toast);
 
@@ -126,7 +133,7 @@ export function StatsView() {
     ws.addRow(EXPORT_HEADERS);
     ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
     ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A5F' } };
-    for (const r of exportRows(segments)) ws.addRow(r);
+    for (const r of exportRows(segments, borehole, project, caveThreshold)) ws.addRow(r);
     ws.columns.forEach((col) => { col.width = 12; });
     ws.getColumn(16).width = 42;
     ws.views = [{ state: 'frozen', ySplit: 1 }];
@@ -140,7 +147,7 @@ export function StatsView() {
     const path = await saveFileAs(`分段成果_${borehole.number}.csv`, ['csv']);
     if (path == null) return;
     const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const text = '\ufeff' + [EXPORT_HEADERS, ...exportRows(segments)].map((r) => r.map(esc).join(',')).join('\r\n');
+    const text = '\ufeff' + [EXPORT_HEADERS, ...exportRows(segments, borehole, project, caveThreshold)].map((r) => r.map(esc).join(',')).join('\r\n');
     await writeFileBytes(path, new TextEncoder().encode(text));
     toast('success', `已导出 ${path}`);
   };

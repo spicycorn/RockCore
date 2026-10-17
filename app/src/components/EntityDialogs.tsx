@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { AppDialog, Button, Field, TextInput } from './ui';
 import type { BoreholeRow, ProjectRow } from '../db/repos';
+import { inclinationToZenith, zenithToInclination } from '../engine/boreholeGeometry';
 import { useApp } from '../store/app';
 
 export interface ProjectDraft {
@@ -80,10 +81,14 @@ export function ProjectDialog({
 export interface BoreholeDraft {
   number: string;
   orifice_elevation: string;
+  /** 孔深：导入后按 Σ回次进尺 自动计算，只读展示 */
   total_depth: string;
+  /** 测量深度：仅作核对参考，不参与出图 */
+  measured_depth: string;
   groundwater_depth: string;
   azimuth: string;
-  inclination_angle: string;
+  /** 天顶角（钻探口径：0=竖直向下，90=水平，>90=仰孔）；库内仍存倾角 */
+  zenith_angle: string;
   orifice_x: string;
   orifice_y: string;
   orifice_z: string;
@@ -96,9 +101,10 @@ function toBoreholeDraft(b?: BoreholeRow | null): BoreholeDraft {
     number: b?.number ?? '',
     orifice_elevation: numText(b?.orifice_elevation ?? null),
     total_depth: numText(b?.total_depth ?? null),
+    measured_depth: numText(b?.measured_depth ?? null),
     groundwater_depth: numText(b?.groundwater_depth ?? null),
     azimuth: numText(b?.azimuth ?? null),
-    inclination_angle: numText(b?.inclination_angle ?? null),
+    zenith_angle: numText(b?.inclination_angle == null ? null : inclinationToZenith(b.inclination_angle)),
     orifice_x: numText(b?.orifice_x ?? null),
     orifice_y: numText(b?.orifice_y ?? null),
     orifice_z: numText(b?.orifice_z ?? null),
@@ -118,6 +124,25 @@ export function BoreholeDialog({
   const set = (k: keyof BoreholeDraft) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setDraft({ ...draft, [k]: e.target.value });
 
+  const submit = async () => {
+    const zen = num(draft.zenith_angle);
+    await saveBorehole(target?.id ?? null, {
+      number: draft.number.trim(),
+      orifice_elevation: num(draft.orifice_elevation),
+      // 孔深由导入按 Σ回次进尺 自动维护；编辑时原样回传，避免被清空
+      total_depth: num(draft.total_depth),
+      measured_depth: num(draft.measured_depth),
+      groundwater_depth: num(draft.groundwater_depth),
+      azimuth: num(draft.azimuth),
+      inclination_angle: zen == null ? null : zenithToInclination(zen),
+      orifice_x: num(draft.orifice_x),
+      orifice_y: num(draft.orifice_y),
+      orifice_z: num(draft.orifice_z),
+    });
+    toast('success', target == null ? '钻孔已创建，可以导入数据了' : '钻孔已更新');
+    onClose();
+  };
+
   return (
     <AppDialog
       open={open}
@@ -126,25 +151,7 @@ export function BoreholeDialog({
       footer={
         <>
           <Button onClick={onClose}>取消</Button>
-          <Button
-            variant="primary"
-            disabled={!valid}
-            onClick={async () => {
-              await saveBorehole(target?.id ?? null, {
-                number: draft.number.trim(),
-                orifice_elevation: num(draft.orifice_elevation),
-                total_depth: num(draft.total_depth),
-                groundwater_depth: num(draft.groundwater_depth),
-                azimuth: num(draft.azimuth),
-                inclination_angle: num(draft.inclination_angle),
-                orifice_x: num(draft.orifice_x),
-                orifice_y: num(draft.orifice_y),
-                orifice_z: num(draft.orifice_z),
-              });
-              toast('success', target == null ? '钻孔已创建，可以导入数据了' : '钻孔已更新');
-              onClose();
-            }}
-          >
+          <Button variant="primary" disabled={!valid} onClick={() => void submit()}>
             保存
           </Button>
         </>
@@ -157,14 +164,18 @@ export function BoreholeDialog({
         <Field label="孔口高程 (m)">
           <TextInput type="number" value={draft.orifice_elevation} onChange={set('orifice_elevation')} />
         </Field>
-        <Field label="孔深 (m)">
-          <TextInput type="number" value={draft.total_depth} onChange={set('total_depth')} />
+        <Field label="孔深 (m)" hint="导入后按 Σ回次进尺 自动计算，出图一律以此为准；不可手填">
+          <TextInput type="number" value={draft.total_depth} readOnly title="由导入的回次进尺自动计算"
+            onChange={set('total_depth')} className="bg-slate-100 text-slate-500" />
+        </Field>
+        <Field label="测量深度 (m)" hint="钻具上提丈量值，仅用于与 Σ进尺 核对偏差，不参与出图">
+          <TextInput type="number" value={draft.measured_depth} onChange={set('measured_depth')} />
         </Field>
         <Field label="孔向方位角 (°)" hint="用于平面布置图与洞轴线关系">
           <TextInput type="number" value={draft.azimuth} onChange={set('azimuth')} />
         </Field>
-        <Field label="倾角 (°)" hint="水平=0，竖直=90（负值=仰孔）；柱状剖面按真实倾角绘制">
-          <TextInput type="number" value={draft.inclination_angle} onChange={set('inclination_angle')} />
+        <Field label="天顶角 (°)" hint="钻探口径：0=竖直向下，90=水平，>90=仰孔（0–180）；柱状图按真实孔轴绘制">
+          <TextInput type="number" value={draft.zenith_angle} onChange={set('zenith_angle')} />
         </Field>
         <Field label="地下水位埋深 (m)">
           <TextInput type="number" value={draft.groundwater_depth} onChange={set('groundwater_depth')} />

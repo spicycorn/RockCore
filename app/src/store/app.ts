@@ -231,6 +231,7 @@ export const useApp = create<AppState>((set, get) => ({
     const runCount = new Set(preview.rows.filter((r) => r.status !== 'blocked' && r.runNo != null).map((r) => r.runNo)).size;
     await saveImport(db, boreholeId, { fileName, startDepth, runCount }, preview.rows, preview.segments);
     await get().refreshBoreholeData();
+    await get().refreshBoreholes(); // 孔深已按 Σ回次进尺 自动回写，侧栏立即反映
     get().toast('success', `导入完成：${preview.segments.length} 个完整性分段`);
   },
 

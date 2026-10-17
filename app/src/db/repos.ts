@@ -5,6 +5,7 @@
  */
 
 import type { ImportRow, ImportSegment } from '../engine/excelImport';
+import { autoGroundwater, boreholeCaveAngle } from '../engine/boreholeGeometry';
 import {
   GroundwaterCondition,
   IntegrityLevel,
@@ -61,6 +62,8 @@ export interface BoreholeRow {
   number: string;
   orifice_elevation: number | null;
   total_depth: number | null;
+  /** 测量深度：仅作与 Σ回次进尺 核对的参考，不参与出图 */
+  measured_depth: number | null;
   groundwater_depth: number | null;
   azimuth: number | null;
   inclination_angle: number | null;
@@ -143,6 +146,42 @@ export function segmentF02(row: SegmentRow) {
   };
 }
 
+/**
+ * 生效 F.0.2 参数（v1.1.2）：库存覆盖值优先；
+ * 地下水（0=自动）按 水位埋深+倾角+段底深度 判定，洞轴夹角（null=自动）按
+ * 孔方位角+倾角+项目洞轴线方位角 计算。数据不足时保持未定，绝不伪造。
+ */
+export function effectiveF02(
+  row: SegmentRow,
+  borehole: BoreholeRow | null,
+  project: ProjectRow | null,
+  caveAngleThreshold = 30,
+) {
+  const base = segmentF02(row);
+  let groundwater = base.groundwater;
+  if (groundwater === GroundwaterCondition.NotSet) {
+    const auto = autoGroundwater(
+      row.depth_end,
+      borehole?.inclination_angle ?? null,
+      borehole?.groundwater_depth ?? null,
+    );
+    groundwater = auto == null
+      ? GroundwaterCondition.NotSet
+      : auto ? GroundwaterCondition.Wet : GroundwaterCondition.Dry;
+  }
+  const caveAxisAngleLessThan30 = base.caveAxisAngleLessThan30 ?? (
+    () => {
+      const angle = boreholeCaveAngle(
+        borehole?.azimuth ?? null,
+        borehole?.inclination_angle ?? null,
+        project?.cave_axis_azimuth ?? null,
+      );
+      return angle == null ? null : angle < caveAngleThreshold;
+    }
+  )();
+  return { ...base, groundwater, caveAxisAngleLessThan30 };
+}
+
 // ---------------------------------------------------------------------------
 // 项目 / 钻孔
 // ---------------------------------------------------------------------------
@@ -189,6 +228,7 @@ export interface BoreholeInput {
   number: string;
   orifice_elevation: number | null;
   total_depth: number | null;
+  measured_depth: number | null;
   groundwater_depth: number | null;
   azimuth: number | null;
   inclination_angle: number | null;
@@ -203,10 +243,10 @@ export async function listBoreholes(db: Sql, projectId: number): Promise<Borehol
 
 export async function createBorehole(db: Sql, projectId: number, b: BoreholeInput): Promise<number> {
   const res = await db.execute(
-    `INSERT INTO boreholes (project_id, number, orifice_elevation, total_depth, groundwater_depth,
+    `INSERT INTO boreholes (project_id, number, orifice_elevation, total_depth, measured_depth, groundwater_depth,
        azimuth, inclination_angle, orifice_x, orifice_y, orifice_z)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`,
-    [projectId, b.number, b.orifice_elevation, b.total_depth, b.groundwater_depth,
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
+    [projectId, b.number, b.orifice_elevation, b.total_depth, b.measured_depth, b.groundwater_depth,
       b.azimuth, b.inclination_angle, b.orifice_x, b.orifice_y, b.orifice_z],
   );
   return lastId(res);
@@ -214,10 +254,10 @@ export async function createBorehole(db: Sql, projectId: number, b: BoreholeInpu
 
 export async function updateBorehole(db: Sql, id: number, b: BoreholeInput): Promise<void> {
   await db.execute(
-    `UPDATE boreholes SET number = ?1, orifice_elevation = ?2, total_depth = ?3, groundwater_depth = ?4,
-       azimuth = ?5, inclination_angle = ?6, orifice_x = ?7, orifice_y = ?8, orifice_z = ?9
-     WHERE id = ?10`,
-    [b.number, b.orifice_elevation, b.total_depth, b.groundwater_depth,
+    `UPDATE boreholes SET number = ?1, orifice_elevation = ?2, total_depth = ?3, measured_depth = ?4, groundwater_depth = ?5,
+       azimuth = ?6, inclination_angle = ?7, orifice_x = ?8, orifice_y = ?9, orifice_z = ?10
+     WHERE id = ?11`,
+    [b.number, b.orifice_elevation, b.total_depth, b.measured_depth, b.groundwater_depth,
       b.azimuth, b.inclination_angle, b.orifice_x, b.orifice_y, b.orifice_z, id],
   );
 }
@@ -254,6 +294,10 @@ export async function saveImport(
   rows: readonly ImportRow[],
   segments: readonly ImportSegment[],
 ): Promise<number> {
+  // 孔深 = 起始深度 + Σ回次进尺（v1.1.2：出图深度一律以进尺为准，测量深度仅核对）
+  const autoTotalDepth = batch.startDepth + rows.reduce(
+    (a, r) => (r.runNo != null && (r.runLengthM ?? 0) > 0 ? a + (r.runLengthM ?? 0) : a), 0,
+  );
   const batchId = await db.transaction([
     { sql: 'DELETE FROM segments WHERE borehole_id = ?1', params: [boreholeId] },
     { sql: 'DELETE FROM run_stats WHERE batch_id IN (SELECT id FROM import_batches WHERE borehole_id = ?1)', params: [boreholeId] },
@@ -263,6 +307,7 @@ export async function saveImport(
             VALUES (?1, ?2, ?3, ?4, ?5)`,
       params: [boreholeId, batch.fileName, new Date().toISOString(), batch.startDepth, batch.runCount],
     },
+    { sql: 'UPDATE boreholes SET total_depth = ?1 WHERE id = ?2', params: [autoTotalDepth, boreholeId] },
   ]);
 
   const ops: { query: string; values?: unknown[] }[] = [];

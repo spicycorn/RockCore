@@ -54,7 +54,7 @@ export function Sidebar() {
       { sep: true },
       { label: '查看回次明细', action: () => { void selectBorehole(b.id).then(() => setTab('runs')); } },
       { label: '分段与围岩分类', action: () => { void selectBorehole(b.id).then(() => setTab('segments')); } },
-      { label: '柱状剖面图', action: () => { void selectBorehole(b.id).then(() => setTab('column')); } },
+      { label: '三维模型', action: () => { void selectBorehole(b.id).then(() => setTab('column')); } },
       { sep: true },
       {
         label: '删除钻孔', danger: true,

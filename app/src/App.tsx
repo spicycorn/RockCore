@@ -10,7 +10,7 @@ import { ImportFlowHost, startImport, useGlobalDrop } from './components/ImportF
 import { ImportView } from './views/ImportView';
 import { RunStatsView } from './views/RunStatsView';
 import { SegmentsView } from './views/SegmentsView';
-import { ColumnView } from './views/ColumnView';
+import { Borehole3DView } from './views/Borehole3DView';
 import { StatsView } from './views/StatsView';
 import { SettingsView } from './views/SettingsView';
 import { useApp, type TabKey } from './store/app';
@@ -89,7 +89,7 @@ export default function App() {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     showContextMenu(rect.left, rect.bottom, ([
       ['import', '导入'], ['runs', '回次明细'], ['segments', '分段与围岩分类'],
-      ['column', '柱状剖面图'], ['stats', '统计'], ['settings', '设置'],
+      ['column', '三维模型'], ['stats', '统计'], ['settings', '设置'],
     ] as [TabKey, string][]).map(([key, label]) => ({ label, action: () => setTab(key) })));
   };
 
@@ -127,7 +127,7 @@ export default function App() {
               { key: 'import', label: '导入' },
               { key: 'runs', label: '回次明细' },
               { key: 'segments', label: '分段与围岩分类' },
-              { key: 'column', label: '柱状剖面图' },
+              { key: 'column', label: '三维模型' },
               { key: 'stats', label: '统计' },
               { key: 'settings', label: '设置' },
             ]}
@@ -136,7 +136,7 @@ export default function App() {
             {activeTab === 'import' && <ImportView />}
             {activeTab === 'runs' && <RunStatsView />}
             {activeTab === 'segments' && <SegmentsView />}
-            {activeTab === 'column' && <ColumnView />}
+            {activeTab === 'column' && <Borehole3DView />}
             {activeTab === 'stats' && <StatsView />}
             {activeTab === 'settings' && <SettingsView />}
           </div>

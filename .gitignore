@@ -39,3 +39,8 @@ Desktop.ini
 
 ##### 涓存椂鏂囦欢 #####
 .tmp-*
+
+##### 本地工具 / 个人笔记 #####
+.dsh-vision-toolkit/
+.vitest-sandbox.mjs
+GitHub常用命令.txt

@@ -77,7 +77,7 @@ export function ImportView() {
             <div className="flex gap-2 mt-3">
               <Button onClick={() => setTab('runs')}>查看回次明细</Button>
               <Button onClick={() => setTab('segments')}>分段与围岩分类</Button>
-              <Button onClick={() => setTab('column')}>柱状剖面图</Button>
+              <Button onClick={() => setTab('column')}>三维模型</Button>
             </div>
           </div>
         ) : (

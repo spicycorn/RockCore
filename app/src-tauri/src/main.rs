@@ -98,7 +98,7 @@ async fn db_execute(
     params: Vec<Value>,
 ) -> Result<Value, String> {
     check_no_tx_control(&sql)?;
-    let mut conn = lock(&state)?;
+    let conn = lock(&state)?;
     let binds = to_sql_values(&params);
     let affected = conn
         .execute(&sql, params_from_iter(as_params(&binds)))
@@ -159,7 +159,7 @@ async fn db_transaction(
     state: tauri::State<'_, DbState>,
     statements: Vec<Stmt>,
 ) -> Result<i64, String> {
-    let mut conn = lock(&state)?;
+    let conn = lock(&state)?;
     if statements.is_empty() {
         return Ok(0);
     }

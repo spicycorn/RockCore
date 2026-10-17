@@ -4,7 +4,7 @@
  */
 
 /** 当前模式版本；后续结构变更时递增并补 migrate() 分支 */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 export const SCHEMA_DDL = `
 CREATE TABLE IF NOT EXISTS projects (
@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS boreholes (
   number            TEXT NOT NULL,
   orifice_elevation REAL,
   total_depth       REAL,
+  measured_depth    REAL,
   groundwater_depth REAL,
   azimuth           REAL,
   inclination_angle REAL,
@@ -129,6 +130,12 @@ export async function ensureSchema(
     if (v < 3) await exec('ALTER TABLE run_stats ADD COLUMN recovery REAL');
     // v4：run_stats 增破碎段标记列（v13 模板「长度，破碎」记录）
     if (v < 4) await exec('ALTER TABLE run_stats ADD COLUMN broken INTEGER NOT NULL DEFAULT 0');
+    // v5：boreholes 增测量深度列（孔深改为 Σ回次进尺 自动计算，测量深度仅作核对）；
+    //     地下水旧「潮湿/渗水(2)」并入「有水(3)」——规范只区分有/无
+    if (v < 5) {
+      await exec('ALTER TABLE boreholes ADD COLUMN measured_depth REAL');
+      await exec('UPDATE segments SET groundwater = 3 WHERE groundwater = 2');
+    }
     await setVersion(SCHEMA_VERSION);
   }
 }

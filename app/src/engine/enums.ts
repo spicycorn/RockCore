@@ -72,7 +72,7 @@ export enum RockHomogeneity {
   HasWeakLayer = 2,
 }
 
-/** 地下水条件 */
+/** 地下水条件（v1.1.2 起规范口径只分有/无；0=自动按水位判定；2 为旧档已并入 3） */
 export enum GroundwaterCondition {
   NotSet = 0,
   Dry = 1,
@@ -133,10 +133,10 @@ export const rockHomogeneityLabel: Record<RockHomogeneity, string> = {
 };
 
 export const groundwaterLabel: Record<GroundwaterCondition, string> = {
-  [GroundwaterCondition.NotSet]: '未设置',
-  [GroundwaterCondition.Dry]: '干燥',
-  [GroundwaterCondition.Damp]: '潮湿/渗水',
-  [GroundwaterCondition.Wet]: '滴水/有地下水',
+  [GroundwaterCondition.NotSet]: '自动（按水位）',
+  [GroundwaterCondition.Dry]: '无水',
+  [GroundwaterCondition.Damp]: '有水（渗水）',
+  [GroundwaterCondition.Wet]: '有水',
 };
 
 /** 围岩类别罗马数字（Unicode 罗马数字，符合规范表书写习惯） */

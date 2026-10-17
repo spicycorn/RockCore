@@ -1,9 +1,10 @@
 /**
  * 平面布置图：孔口 X/Y 散点 + 洞轴线方位（方位角 0=北=+Y，顺时针）。
- * 只导出 buildPlanOption，由 ColumnView 的平面模式挂载。
+ * 只导出 buildPlanOption，由 Borehole3DView 的平面模式挂载。
  */
 
 import type { BoreholeRow } from '../db/repos';
+import { inclinationToZenith } from '../engine/boreholeGeometry';
 import { echarts } from '../lib/echarts';
 
 export function buildPlanOption(
@@ -40,7 +41,7 @@ export function buildPlanOption(
           const rows = [
             `<b>${b.number}</b>`,
             `X=${b.orifice_x}　Y=${b.orifice_y}`,
-            `方位角 ${b.azimuth ?? '未填'}°　倾角 ${b.inclination_angle ?? '未填'}°`,
+            `方位角 ${b.azimuth ?? '未填'}°　天顶角 ${b.inclination_angle == null ? '未填' : inclinationToZenith(b.inclination_angle)}°`,
           ];
           if (b.orifice_elevation != null) rows.push(`孔口高程 ${b.orifice_elevation} m`);
           return rows.join('<br/>');
